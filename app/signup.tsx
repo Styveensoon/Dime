@@ -50,9 +50,9 @@ export default function SignupScreen() {
 
     setLoading(true);
     try {
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulación
-      Alert.alert('Registro Exitoso', `Bienvenido, ${username}. Tu cuenta ha sido creada.`);
-      router.push('/main');
+      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulación de registro
+      // Registro exitoso: navegación inmediata a la primera prueba del orden solicitado
+      router.replace('/TestPHQ9'); // Redirige a testPHQ9, luego testGAD7 y testMSE en sus respectivas pantallas
     } catch (error) {
       Alert.alert('Error', 'No se pudo crear la cuenta en este momento.');
     } finally {
