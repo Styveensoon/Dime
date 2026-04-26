@@ -1,8 +1,8 @@
 import { leerPerfil } from '@/app/utils/firebase';
 import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Buffer } from 'buffer';
 import { Link, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -12,13 +12,12 @@ import {
   Platform,
   SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  View,
-  StatusBar
+  View
 } from 'react-native';
-import { Buffer } from 'buffer';
 
 const IMSS_COLORS = {
   green: '#1F4529',
@@ -60,7 +59,6 @@ export default function LoginScreen() {
       await AsyncStorage.setItem('userEmail', email);
       await AsyncStorage.setItem('username', perfil.username || '');
 
-      Alert.alert('Éxito', `¡Bienvenido ${perfil.username}!`);
       router.push('/main');
     } catch (error: any) {
       Alert.alert('Error', error.message || 'No se pudo iniciar sesión. Verifique sus datos.');

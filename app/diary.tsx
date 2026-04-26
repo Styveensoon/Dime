@@ -1,456 +1,210 @@
-import { guardarDiario } from '@/app/utils/firebase';
-import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Link, useRouter } from 'expo-router';
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import { 
+  ActivityIndicator, Alert, KeyboardAvoidingView, Platform, SafeAreaView, 
+  ScrollView, StyleSheet, TextInput, TouchableOpacity, View, Dimensions 
+} from 'react-native';
+import { ThemedText } from '@/components/themed-text';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from 'expo-router';
+
+const { width } = Dimensions.get('window');
+
+// --- PALETA OFICIAL IMSS MODERNIZADA ---
+const IMSS_COLORS = {
+  green: '#1F4529',     // Verde IMSS
+  gold: '#B38E5D',      // Dorado Institucional
+  lightBg: '#F4F7F5',   // Gris muy claro (clínico)
+  white: '#FFFFFF',
+  text: '#1A1A1A',
+  muted: '#8E8E93',
+  danger: '#D32F2F'
+};
+
+const MOODS = [
+  { label: 'Crítico', icon: '😫', color: '#D32F2F', val: 1 },
+  { label: 'Bajo', icon: '😔', color: '#F57C00', val: 2 },
+  { label: 'Estable', icon: '😐', color: '#1F4529', val: 3 },
+  { label: 'Óptimo', icon: '😄', color: '#2E7D32', val: 4 }
+];
 
 interface DiaryEntry {
   id: string;
   fecha: string;
-  titulo: string;
-  contenido: string;
-  emociones: string[];
+  valor_animo: number;
+  texto_diario: string;
 }
 
 export default function DiaryScreen() {
-  const colorScheme = useColorScheme();
-  const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
-  
   const [viewMode, setViewMode] = useState<'list' | 'write'>('list');
-  const [titulo, setTitulo] = useState('');
-  const [contenido, setContenido] = useState('');
-  const [emociones, setEmociones] = useState('');
+  const [mood, setMood] = useState<number | null>(null);
+  const [nota, setNota] = useState('');
   const [entries, setEntries] = useState<DiaryEntry[]>([]);
   const [loading, setLoading] = useState(false);
-  const [userId, setUserId] = useState<string>('');
+  const [streak, setStreak] = useState(0); // Funcionalidad de Racha
 
-  const emotions = ['Feliz', 'Triste', 'Ansioso', 'Relajado', 'Motivado', 'Confundido'];
-
-  useEffect(() => {
-    const cargarEntradas = async () => {
-      try {
-        const id = await AsyncStorage.getItem('userId');
-        if (id) {
-          setUserId(id);
-          // Cargar entradas de Firebase
-          const url = `https://firestore.googleapis.com/v1/projects/hack-441ef/databases/(default)/documents/usuarios/${id}/diario`;
-          const res = await fetch(`${url}?key=AIzaSyBWg_520tyLRRQZCXCWYNkhS-FCEtmDusA`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data.documents) {
-              const loadedEntries = data.documents.map((doc: any) => {
-                const fields = doc.fields;
-                return {
-                  id: doc.name.split('/').pop(),
-                  fecha: fields.fecha?.stringValue || 'Sin fecha',
-                  titulo: fields.titulo?.stringValue || 'Sin título',
-                  contenido: fields.contenido?.stringValue || '',
-                  emociones: fields.emociones?.arrayValue?.values?.map((v: any) => v.stringValue) || [],
-                };
-              });
-              setEntries(loadedEntries.sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()));
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error cargando entradas:', error);
-      }
-    };
-    cargarEntradas();
+  useEffect(() => { 
+    cargarEntradas(); 
   }, []);
 
-  const handleSaveEntry = async () => {
-    if (!titulo || !contenido) {
-      Alert.alert('Error', 'Por favor completa el título y el contenido');
-      return;
-    }
-
+  const cargarEntradas = async () => {
     setLoading(true);
     try {
-      const entryId = `entrada_${Date.now()}`;
-      const newEntry: DiaryEntry = {
-        id: entryId,
-        fecha: new Date().toISOString(),
-        titulo,
-        contenido,
-        emociones: emociones.split(',').map(e => e.trim()).filter(e => e),
-      };
-
-      // Guardar en Firebase
-      if (userId) {
-        await guardarDiario(userId, newEntry);
+      const id = await AsyncStorage.getItem('userId');
+      if (!id) return;
+      const res = await fetch(`https://firestore.googleapis.com/v1/projects/hack-441ef/databases/(default)/documents/usuarios/${id}/diario?key=AIzaSyBWg_520tyLRRQZCXCWYNkhS-FCEtmDusA`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.documents) {
+          const loaded: DiaryEntry[] = data.documents.map((doc: any) => ({
+            id: doc.name.split('/').pop(),
+            fecha: doc.fields.fecha?.stringValue || '',
+            valor_animo: parseInt(doc.fields.valor_animo?.integerValue || '0'),
+            texto_diario: doc.fields.texto_diario?.stringValue || '',
+          }));
+          const sorted = loaded.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime());
+          setEntries(sorted);
+          setStreak(sorted.length); // Ejemplo simple de racha por cantidad
+        }
       }
-
-      setEntries([newEntry, ...entries]);
-      setTitulo('');
-      setContenido('');
-      setEmociones('');
-      setViewMode('list');
-      Alert.alert('Éxito', 'Entrada guardada en tu diario');
-    } catch (error: any) {
-      Alert.alert('Error', error.message || 'No se pudo guardar la entrada');
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { console.error(e); } finally { setLoading(false); }
   };
 
-  if (viewMode === 'write') {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-        <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          style={styles.container}
-        >
-          <ScrollView contentContainerStyle={styles.writeContainer}>
-            <View style={styles.header}>
-              <TouchableOpacity onPress={() => setViewMode('list')}>
-                <ThemedText style={[styles.backText, { color: colors.tint }]}>
-                  ← Atrás
-                </ThemedText>
-              </TouchableOpacity>
-              <ThemedText type="title" style={styles.title}>
-                Nueva Entrada
-              </ThemedText>
-            </View>
+  const handleSaveEntry = async () => {
+    if (!mood || nota.length < 5) return Alert.alert("Atención", "Complete su reporte de estado.");
+    setLoading(true);
+    try {
+      const id = await AsyncStorage.getItem('userId');
+      const entryId = `entry_${Date.now()}`;
+      const payload = {
+        fields: {
+          fecha: { stringValue: new Date().toISOString() },
+          valor_animo: { integerValue: String(mood) },
+          texto_diario: { stringValue: nota },
+        }
+      };
 
-            <View style={styles.form}>
-              <ThemedText style={[styles.label, { color: colors.text }]}>
-                Título
-              </ThemedText>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    borderColor: colors.icon,
-                    color: colors.text,
-                    backgroundColor: colorScheme === 'dark' ? '#2a2a2a' : '#f5f5f5',
-                  },
-                ]}
-                placeholder="¿Sobre qué quieres escribir?"
-                placeholderTextColor={colors.icon}
-                value={titulo}
-                onChangeText={setTitulo}
-              />
-
-              <ThemedText style={[styles.label, { color: colors.text }]}>
-                Contenido
-              </ThemedText>
-              <TextInput
-                style={[
-                  styles.textArea,
-                  {
-                    borderColor: colors.icon,
-                    color: colors.text,
-                    backgroundColor: colorScheme === 'dark' ? '#2a2a2a' : '#f5f5f5',
-                  },
-                ]}
-                placeholder="Escribe tus pensamientos y sentimientos..."
-                placeholderTextColor={colors.icon}
-                value={contenido}
-                onChangeText={setContenido}
-                multiline
-                numberOfLines={10}
-              />
-
-              <ThemedText style={[styles.label, { color: colors.text }]}>
-                Emociones (separadas por comas)
-              </ThemedText>
-              <TextInput
-                style={[
-                  styles.input,
-                  {
-                    borderColor: colors.icon,
-                    color: colors.text,
-                    backgroundColor: colorScheme === 'dark' ? '#2a2a2a' : '#f5f5f5',
-                  },
-                ]}
-                placeholder="Ej: Feliz, Motivado"
-                placeholderTextColor={colors.icon}
-                value={emociones}
-                onChangeText={setEmociones}
-              />
-
-              <View style={styles.emotionChips}>
-                {emotions.map((emotion) => (
-                  <TouchableOpacity
-                    key={emotion}
-                    style={[
-                      styles.chip,
-                      {
-                        backgroundColor: emociones.includes(emotion)
-                          ? colors.tint
-                          : colorScheme === 'dark'
-                          ? '#2a2a2a'
-                          : '#f0f0f0',
-                        borderColor: colors.tint,
-                      },
-                    ]}
-                    onPress={() => {
-                      if (emociones.includes(emotion)) {
-                        setEmociones(
-                          emociones
-                            .split(',')
-                            .map(e => e.trim())
-                            .filter(e => e !== emotion)
-                            .join(', ')
-                        );
-                      } else {
-                        setEmociones(emociones ? emociones + ', ' + emotion : emotion);
-                      }
-                    }}
-                  >
-                    <ThemedText
-                      style={[
-                        styles.chipText,
-                        {
-                          color: emociones.includes(emotion) ? '#fff' : colors.text,
-                        },
-                      ]}
-                    >
-                      {emotion}
-                    </ThemedText>
-                  </TouchableOpacity>
-                ))}
-              </View>
-
-              <TouchableOpacity
-                style={[styles.guardarBtn, { backgroundColor: colors.tint, opacity: loading ? 0.6 : 1 }]}
-                onPress={handleSaveEntry}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <ThemedText style={styles.guardarText}>Guardar Entrada</ThemedText>
-                )}
-              </TouchableOpacity>
-            </View>
-          </ScrollView>
-        </KeyboardAvoidingView>
-      </SafeAreaView>
-    );
-  }
+      await fetch(`https://firestore.googleapis.com/v1/projects/hack-441ef/databases/(default)/documents/usuarios/${id}/diario/${entryId}?key=AIzaSyBWg_520tyLRRQZCXCWYNkhS-FCEtmDusA`, {
+        method: 'PATCH',
+        body: JSON.stringify(payload)
+      });
+      
+      setNota(''); setMood(null); setViewMode('list'); cargarEntradas();
+    } catch (e) { Alert.alert("Error", "Sincronización fallida"); } finally { setLoading(false); }
+  };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <ScrollView contentContainerStyle={styles.listContainer}>
-        <View style={styles.header}>
-          <Link href="/main" asChild>
-            <TouchableOpacity>
-              <ThemedText style={[styles.backText, { color: colors.tint }]}>
-                ← Atrás
-              </ThemedText>
+    <SafeAreaView style={styles.root}>
+      {/* Header Institucional */}
+      <View style={styles.topBar}>
+        <TouchableOpacity onPress={() => router.replace('/(tabs)/main')}>
+          <ThemedText style={styles.backTxt}>Panel Principal</ThemedText>
+        </TouchableOpacity>
+        <View style={styles.streakBadge}>
+          <ThemedText style={styles.streakTxt}>🔥 {streak} días</ThemedText>
+        </View>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        {viewMode === 'list' ? (
+          <>
+            <ThemedText style={styles.mainTitle}>Mi Diario <ThemedText style={{color: IMSS_COLORS.gold}}>Salud</ThemedText></ThemedText>
+            <ThemedText style={styles.subTitle}>Seguimiento de adherencia emocional</ThemedText>
+
+            <TouchableOpacity style={styles.mainActionBtn} onPress={() => setViewMode('write')}>
+              <ThemedText style={styles.mainActionBtnTxt}>+ REGISTRAR ESTADO HOY</ThemedText>
             </TouchableOpacity>
-          </Link>
-          <ThemedText type="title" style={styles.title}>
-            Mi Diario
-          </ThemedText>
-          <TouchableOpacity
-            style={[styles.newBtn, { backgroundColor: colors.tint }]}
-            onPress={() => setViewMode('write')}
-          >
-            <ThemedText style={styles.newBtnText}>+ Nueva</ThemedText>
-          </TouchableOpacity>
-        </View>
 
-        <View style={styles.entriesList}>
-          {entries.length === 0 ? (
-            <View style={styles.emptyState}>
-              <ThemedText style={[styles.emptyText, { color: colors.icon }]}>
-                No hay entradas aún. ¡Crea tu primera entrada!
-              </ThemedText>
-            </View>
-          ) : (
-            entries.map((entry) => (
-              <View
-                key={entry.id}
-                style={[
-                  styles.entryCard,
-                  {
-                    backgroundColor: colorScheme === 'dark' ? '#2a2a2a' : '#f9f9f9',
-                    borderColor: colors.icon,
-                  },
-                ]}
-              >
-                <View style={styles.entryHeader}>
-                  <ThemedText type="subtitle" style={styles.entryTitulo}>
-                    {entry.titulo}
-                  </ThemedText>
-                  <ThemedText style={[styles.entryFecha, { color: colors.icon }]}>
-                    {entry.fecha}
-                  </ThemedText>
-                </View>
-
-                <ThemedText
-                  style={[styles.entryContenido, { color: colors.text }]}
-                  numberOfLines={3}
-                >
-                  {entry.contenido}
-                </ThemedText>
-
-                {entry.emociones.length > 0 && (
-                  <View style={styles.emotionsContainer}>
-                    {entry.emociones.map((emotion) => (
-                      <View
-                        key={emotion}
-                        style={[
-                          styles.emotionBadge,
-                          { backgroundColor: colors.tint },
-                        ]}
-                      >
-                        <ThemedText style={styles.emotionBadgeText}>
-                          {emotion}
-                        </ThemedText>
-                      </View>
-                    ))}
+            <View style={styles.historySection}>
+              <ThemedText style={styles.historyTitle}>Historial Reciente</ThemedText>
+              {loading ? <ActivityIndicator color={IMSS_COLORS.green} /> : 
+                entries.map(item => (
+                  <View key={item.id} style={styles.logCard}>
+                    <View style={[styles.moodIndicator, { backgroundColor: MOODS.find(m=>m.val===item.valor_animo)?.color || IMSS_COLORS.green }]} />
+                    <View style={styles.logInfo}>
+                      <ThemedText style={styles.logDate}>{new Date(item.fecha).toLocaleDateString('es-MX', { weekday: 'long', day: 'numeric' })}</ThemedText>
+                      <ThemedText style={styles.logText} numberOfLines={1}>{item.texto_diario}</ThemedText>
+                    </View>
+                    <ThemedText style={styles.logEmoji}>{MOODS.find(m=>m.val===item.valor_animo)?.icon}</ThemedText>
                   </View>
-                )}
-              </View>
-            ))
-          )}
-        </View>
+                ))
+              }
+            </View>
+          </>
+        ) : (
+          <KeyboardAvoidingView behavior="padding">
+            <ThemedText style={styles.mainTitle}>Nueva Entrada</ThemedText>
+            <ThemedText style={styles.subTitle}>¿Cómo se siente en este momento?</ThemedText>
+
+            <View style={styles.moodSelector}>
+              {MOODS.map(m => (
+                <TouchableOpacity 
+                  key={m.val} 
+                  onPress={() => setMood(m.val)} 
+                  style={[styles.moodCircle, mood === m.val && { borderColor: m.color, backgroundColor: m.color + '10', borderWidth: 2 }]}
+                >
+                  <ThemedText style={{fontSize: 28}}>{m.icon}</ThemedText>
+                  <ThemedText style={[styles.moodLbl, mood === m.val && { color: m.color, fontWeight: '700' }]}>{m.label}</ThemedText>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <View style={styles.inputBox}>
+              <ThemedText style={styles.inputLabel}>NOTAS DEL PACIENTE</ThemedText>
+              <TextInput 
+                style={styles.textInput} 
+                placeholder="Describa síntomas o pensamientos..." 
+                multiline 
+                value={nota} 
+                onChangeText={setNota}
+              />
+            </View>
+
+            <TouchableOpacity style={styles.confirmBtn} onPress={handleSaveEntry}>
+              <ThemedText style={styles.confirmBtnTxt}>SINCRONIZAR CON MI EXPEDIENTE</ThemedText>
+            </TouchableOpacity>
+            
+            <TouchableOpacity onPress={() => setViewMode('list')} style={{marginTop: 20, alignItems: 'center'}}>
+              <ThemedText style={{color: IMSS_COLORS.danger, fontWeight: '600'}}>Cancelar registro</ThemedText>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  listContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-  },
-  writeContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-  },
-  header: {
-    marginBottom: 30,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  backText: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    flex: 1,
-    marginLeft: 10,
-  },
-  newBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  newBtnText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  form: {
-    gap: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    fontSize: 16,
-  },
-  textArea: {
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 15,
-    paddingVertical: 12,
-    fontSize: 16,
-    textAlignVertical: 'top',
-    minHeight: 150,
-  },
-  emotionChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-  },
-  chip: {
-    borderWidth: 1,
-    borderRadius: 20,
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-  },
-  chipText: {
-    fontSize: 13,
-    fontWeight: '500',
-  },
-  guardarBtn: {
-    paddingVertical: 14,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 20,
-  },
-  guardarText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#fff',
-  },
-  entriesList: {
-    gap: 16,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: 40,
-  },
-  emptyText: {
-    fontSize: 16,
-    textAlign: 'center',
-  },
-  entryCard: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
-    gap: 12,
-  },
-  entryHeader: {
-    gap: 4,
-  },
-  entryTitulo: {
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  entryFecha: {
-    fontSize: 12,
-  },
-  entryContenido: {
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  emotionsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginTop: 8,
-  },
-  emotionBadge: {
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  emotionBadgeText: {
-    fontSize: 12,
-    fontWeight: '500',
-    color: '#fff',
-  },
+  root: { flex: 1, backgroundColor: IMSS_COLORS.lightBg },
+  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: IMSS_COLORS.white },
+  backTxt: { color: IMSS_COLORS.green, fontWeight: '700', fontSize: 14 },
+  streakBadge: { backgroundColor: IMSS_COLORS.green, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  streakTxt: { color: IMSS_COLORS.white, fontSize: 12, fontWeight: 'bold' },
+  
+  scrollContent: { padding: 25 },
+  mainTitle: { fontSize: 32, fontWeight: '800', color: IMSS_COLORS.green },
+  subTitle: { fontSize: 15, color: IMSS_COLORS.muted, marginBottom: 30, marginTop: 5 },
+
+  mainActionBtn: { backgroundColor: IMSS_COLORS.green, padding: 20, borderRadius: 15, alignItems: 'center', elevation: 4 },
+  mainActionBtnTxt: { color: IMSS_COLORS.white, fontWeight: 'bold', letterSpacing: 1 },
+
+  historySection: { marginTop: 40 },
+  historyTitle: { fontSize: 18, fontWeight: '700', color: IMSS_COLORS.green, marginBottom: 20 },
+  logCard: { backgroundColor: IMSS_COLORS.white, marginBottom: 12, borderRadius: 12, flexDirection: 'row', alignItems: 'center', padding: 15, elevation: 1 },
+  moodIndicator: { width: 4, height: '100%', borderRadius: 2, marginRight: 15 },
+  logInfo: { flex: 1 },
+  logDate: { fontSize: 12, color: IMSS_COLORS.muted, textTransform: 'capitalize' },
+  logText: { fontSize: 15, fontWeight: '500', color: IMSS_COLORS.text, marginTop: 2 },
+  logEmoji: { fontSize: 22 },
+
+  moodSelector: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 30 },
+  moodCircle: { width: width * 0.2, alignItems: 'center', padding: 10, borderRadius: 15, backgroundColor: IMSS_COLORS.white },
+  moodLbl: { fontSize: 10, marginTop: 8, color: IMSS_COLORS.muted },
+
+  inputBox: { backgroundColor: IMSS_COLORS.white, padding: 20, borderRadius: 15 },
+  inputLabel: { fontSize: 11, fontWeight: '800', color: IMSS_COLORS.gold, marginBottom: 10 },
+  textInput: { fontSize: 16, color: IMSS_COLORS.text, minHeight: 120, textAlignVertical: 'top' },
+
+  confirmBtn: { backgroundColor: IMSS_COLORS.green, marginTop: 30, padding: 20, borderRadius: 15, alignItems: 'center' },
+  confirmBtnTxt: { color: IMSS_COLORS.white, fontWeight: '900', fontSize: 13 }
 });
