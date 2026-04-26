@@ -1,8 +1,8 @@
-import { guardarPerfil } from '@/app/utils/firebase';
+import { crearPerfil } from '@/app/utils/firebase';
 import { ThemedText } from '@/components/themed-text';
-import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Buffer } from 'buffer';
 import { Link, useRouter } from 'expo-router';
 import React, { useState } from 'react';
 import {
@@ -12,13 +12,13 @@ import {
   Platform,
   SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  View,
-  StatusBar
+  View
 } from 'react-native';
-import { Buffer } from 'buffer';
+import { Ionicons } from '@expo/vector-icons'; 
 
 const IMSS_COLORS = {
   green: '#1F4529',
@@ -33,50 +33,53 @@ export default function SignupScreen() {
   const isDark = colorScheme === 'dark';
   const router = useRouter();
   
-  // VARIABLES Y ESTADOS ORIGINALES (SIN CAMBIOS)
   const [email, setEmail] = useState('');
-  const [username, setUsername] = useState('');
   const [nss, setNss] = useState('');
+  const [nombre, setNombre] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // LÓGICA DE REGISTRO ORIGINAL (SIN CAMBIOS)
-  const handleSignup = async () => {
-    if (!email || !username || !nss || !password || !confirmPassword) {
-      Alert.alert('Atención', 'Por favor completa todos los campos institucionalmente requeridos.');
+  const handleRegister = async () => {
+    // Validaciones básicas (Se retiró la validación del CURP)
+    if (!email || !nss || !nombre || !password || !confirmPassword) {
+      Alert.alert('Atención', 'Por favor completa todos los campos obligatorios.');
       return;
     }
-    if (nss.length !== 11) {
-      Alert.alert('NSS Inválido', 'El Número de Seguridad Social debe tener exactamente 11 dígitos.');
-      return;
-    }
+
     if (password !== confirmPassword) {
       Alert.alert('Error', 'Las contraseñas no coinciden.');
+      return;
+    }
+    
+    if (nss.length !== 11) {
+      Alert.alert('Error', 'El NSS debe tener 11 dígitos numéricos.');
       return;
     }
 
     setLoading(true);
     try {
       const userId = Buffer.from(email).toString('base64');
-      await guardarPerfil(userId, {
-        email,
-        username,
-        nss,
-        password, 
-        createdAt: new Date().toISOString(),
-        exercisesCompleted: 0,
-        diaryEntries: 0,
-      });
+      
+      const userData = {
+        userId,
+        username: nombre,
+        nss
+      };
 
+      await crearPerfil(userId, userData);
+      
       await AsyncStorage.setItem('userId', userId);
       await AsyncStorage.setItem('userEmail', email);
-      await AsyncStorage.setItem('username', username);
+      await AsyncStorage.setItem('username', nombre);
       await AsyncStorage.setItem('userNss', nss);
 
-      router.push('/testGAD7');
+      router.replace('/main');
     } catch (error: any) {
-      Alert.alert('Error de Registro', error.message || 'No se pudo conectar con el servidor.');
+      Alert.alert('Error de Registro', error.message || 'No se pudo crear el perfil. Verifique sus datos.');
     } finally {
       setLoading(false);
     }
@@ -89,54 +92,51 @@ export default function SignupScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
         style={{ flex: 1 }}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-          
+        <ScrollView 
+          contentContainerStyle={styles.scrollContent} 
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header Minimalista */}
           <View style={styles.headerSection}>
+            <View style={styles.logoSquare}>
+              <ThemedText style={styles.logoText}>IMSS</ThemedText>
+            </View>
             <ThemedText type="title" style={[styles.title, { color: isDark ? '#FFF' : IMSS_COLORS.green }]}>
               Crear Cuenta
             </ThemedText>
-            <View style={styles.goldLine} />
             <ThemedText style={[styles.subtitle, { color: IMSS_COLORS.gray }]}>
-              Regístrate para comenzar tu seguimiento de bienestar digital.
+              Regístrate en Salud Digital
             </ThemedText>
           </View>
 
+          {/* Formulario Estilizado */}
           <View style={styles.formSection}>
             
-            {/* Nombre de Usuario */}
-            <View style={styles.inputGroup}>
-              <ThemedText style={styles.label}>Nombre de Usuario</ThemedText>
+            {/* Nombre Completo */}
+            <View style={styles.inputContainer}>
+              <ThemedText style={styles.label}>Nombre Completo</ThemedText>
               <TextInput
-                style={[styles.input, { backgroundColor: isDark ? '#1E1E1E' : IMSS_COLORS.lightGray, color: isDark ? '#FFF' : '#000' }]}
-                placeholder="Ej. JuanPerez88"
+                style={[
+                  styles.input,
+                  { backgroundColor: isDark ? '#1E1E1E' : IMSS_COLORS.lightGray, color: isDark ? '#FFF' : '#000' }
+                ]}
+                placeholder="Juan Pérez García"
                 placeholderTextColor="#999"
-                value={username}
-                onChangeText={setUsername}
+                value={nombre}
+                onChangeText={setNombre}
                 editable={!loading}
               />
             </View>
 
-            {/* NSS */}
-            <View style={styles.inputGroup}>
-              <ThemedText style={styles.label}>NSS (11 dígitos)</ThemedText>
-              <TextInput
-                style={[styles.input, { backgroundColor: isDark ? '#1E1E1E' : IMSS_COLORS.lightGray, color: isDark ? '#FFF' : '#000' }]}
-                placeholder="00000000000"
-                placeholderTextColor="#999"
-                value={nss}
-                onChangeText={setNss}
-                keyboardType="numeric"
-                maxLength={11}
-                editable={!loading}
-              />
-            </View>
-
-            {/* Correo */}
-            <View style={styles.inputGroup}>
+            {/* Correo Electrónico */}
+            <View style={styles.inputContainer}>
               <ThemedText style={styles.label}>Correo Electrónico</ThemedText>
               <TextInput
-                style={[styles.input, { backgroundColor: isDark ? '#1E1E1E' : IMSS_COLORS.lightGray, color: isDark ? '#FFF' : '#000' }]}
-                placeholder="correo@ejemplo.com"
+                style={[
+                  styles.input,
+                  { backgroundColor: isDark ? '#1E1E1E' : IMSS_COLORS.lightGray, color: isDark ? '#FFF' : '#000' }
+                ]}
+                placeholder="ejemplo@correo.com"
                 placeholderTextColor="#999"
                 value={email}
                 onChangeText={setEmail}
@@ -146,51 +146,104 @@ export default function SignupScreen() {
               />
             </View>
 
-            {/* Contraseña */}
-            <View style={styles.inputGroup}>
-              <ThemedText style={styles.label}>Contraseña</ThemedText>
+            {/* NSS (Ahora ocupa todo el ancho) */}
+            <View style={styles.inputContainer}>
+              <ThemedText style={styles.label}>NSS (11 dígitos)</ThemedText>
               <TextInput
-                style={[styles.input, { backgroundColor: isDark ? '#1E1E1E' : IMSS_COLORS.lightGray, color: isDark ? '#FFF' : '#000' }]}
-                placeholder="••••••••"
+                style={[
+                  styles.input,
+                  { backgroundColor: isDark ? '#1E1E1E' : IMSS_COLORS.lightGray, color: isDark ? '#FFF' : '#000' }
+                ]}
+                placeholder="12345678901"
                 placeholderTextColor="#999"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
+                value={nss}
+                onChangeText={setNss}
+                keyboardType="numeric"
+                maxLength={11}
                 editable={!loading}
               />
+            </View>
+
+            {/* Contraseña */}
+            <View style={styles.inputContainer}>
+              <ThemedText style={styles.label}>Contraseña</ThemedText>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={[
+                    styles.input,
+                    styles.passwordInput,
+                    { backgroundColor: isDark ? '#1E1E1E' : IMSS_COLORS.lightGray, color: isDark ? '#FFF' : '#000' }
+                  ]}
+                  placeholder="••••••••"
+                  placeholderTextColor="#999"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword}
+                  editable={!loading}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIconContainer}
+                  onPress={() => setShowPassword(!showPassword)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons 
+                    name={showPassword ? 'eye-off' : 'eye'} 
+                    size={24} 
+                    color={IMSS_COLORS.gray} 
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
             {/* Confirmar Contraseña */}
-            <View style={styles.inputGroup}>
+            <View style={styles.inputContainer}>
               <ThemedText style={styles.label}>Confirmar Contraseña</ThemedText>
-              <TextInput
-                style={[styles.input, { backgroundColor: isDark ? '#1E1E1E' : IMSS_COLORS.lightGray, color: isDark ? '#FFF' : '#000' }]}
-                placeholder="••••••••"
-                placeholderTextColor="#999"
-                value={confirmPassword}
-                onChangeText={setConfirmPassword}
-                secureTextEntry
-                editable={!loading}
-              />
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={[
+                    styles.input,
+                    styles.passwordInput,
+                    { backgroundColor: isDark ? '#1E1E1E' : IMSS_COLORS.lightGray, color: isDark ? '#FFF' : '#000' }
+                  ]}
+                  placeholder="••••••••"
+                  placeholderTextColor="#999"
+                  value={confirmPassword}
+                  onChangeText={setConfirmPassword}
+                  secureTextEntry={!showConfirmPassword}
+                  editable={!loading}
+                />
+                <TouchableOpacity
+                  style={styles.eyeIconContainer}
+                  onPress={() => setShowConfirmPassword(!showConfirmPassword)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons 
+                    name={showConfirmPassword ? 'eye-off' : 'eye'} 
+                    size={24} 
+                    color={IMSS_COLORS.gray} 
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <TouchableOpacity
-              style={[styles.registerButton, { backgroundColor: IMSS_COLORS.green }]}
-              onPress={handleSignup}
+              style={[styles.mainButton, { backgroundColor: IMSS_COLORS.green }]}
+              onPress={handleRegister}
               disabled={loading}
             >
               {loading ? (
                 <ActivityIndicator color="#FFF" />
               ) : (
-                <ThemedText style={styles.buttonText}>Finalizar Registro</ThemedText>
+                <ThemedText style={styles.buttonText}>Registrarse</ThemedText>
               )}
             </TouchableOpacity>
 
-            <View style={styles.loginLinkBox}>
-              <ThemedText style={{ color: IMSS_COLORS.gray }}>¿Ya tienes una cuenta?</ThemedText>
-              <Link href="/login" asChild>
+            {/* Volver al Login */}
+            <View style={styles.signupBox}>
+              <ThemedText style={{ color: IMSS_COLORS.gray }}>¿Ya tienes cuenta?</ThemedText>
+              <Link href="/" asChild>
                 <TouchableOpacity>
-                  <ThemedText style={[styles.loginLink, { color: IMSS_COLORS.green }]}>
+                  <ThemedText style={[styles.signupLink, { color: IMSS_COLORS.green }]}>
                     Inicia Sesión
                   </ThemedText>
                 </TouchableOpacity>
@@ -208,53 +261,78 @@ const styles = StyleSheet.create({
   scrollContent: { 
     flexGrow: 1, 
     paddingHorizontal: 30, 
-    paddingTop: 40,
-    paddingBottom: 50 
+    justifyContent: 'center',
+    paddingVertical: 30 
   },
-  headerSection: { marginBottom: 30 },
-  title: { fontSize: 32, fontWeight: '800', marginBottom: 5 },
-  goldLine: { 
-    height: 4, 
-    width: 45, 
-    backgroundColor: IMSS_COLORS.gold, 
-    marginBottom: 15, 
-    borderRadius: 2 
+  headerSection: { 
+    alignItems: 'center', 
+    marginBottom: 40 
   },
-  subtitle: { fontSize: 15, lineHeight: 22, fontWeight: '500' },
+  logoSquare: { 
+    width: 50, 
+    height: 50, 
+    backgroundColor: IMSS_COLORS.green, 
+    borderRadius: 12, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginBottom: 15,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 8
+  },
+  logoText: { color: '#FFF', fontWeight: '900', fontSize: 14 },
+  title: { fontSize: 28, fontWeight: '800', marginBottom: 5 },
+  subtitle: { fontSize: 15, fontWeight: '500' },
   formSection: { gap: 18 },
-  inputGroup: { gap: 8 },
+  inputContainer: { gap: 7 },
   label: { 
-    fontSize: 12, 
+    fontSize: 11, 
     fontWeight: '700', 
     color: IMSS_COLORS.green, 
     marginLeft: 5,
     textTransform: 'uppercase' 
   },
+  inputWrapper: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
   input: { 
     height: 55, 
-    borderRadius: 15, 
+    borderRadius: 16, 
     paddingHorizontal: 18, 
     fontSize: 15,
     borderWidth: 1,
     borderColor: 'transparent'
   },
-  registerButton: { 
-    height: 60, 
-    borderRadius: 18, 
+  passwordInput: {
+    paddingRight: 60,
+  },
+  eyeIconContainer: {
+    position: 'absolute',
+    right: 15,
+    height: '100%',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
+  },
+  mainButton: { 
+    height: 55, 
+    borderRadius: 16, 
     justifyContent: 'center', 
     alignItems: 'center', 
     marginTop: 10,
     elevation: 4,
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
+    shadowColor: IMSS_COLORS.green,
+    shadowOpacity: 0.3,
     shadowRadius: 8
   },
-  buttonText: { fontSize: 17, fontWeight: '700', color: '#fff' },
-  loginLinkBox: { 
+  buttonText: { fontSize: 17, fontWeight: '700', color: '#FFF' },
+  signupBox: { 
     marginTop: 20, 
     flexDirection: 'row', 
     justifyContent: 'center', 
-    gap: 8 
+    gap: 8,
+    alignItems: 'center'
   },
-  loginLink: { fontSize: 15, fontWeight: '700' },
+  signupLink: { fontSize: 14, fontWeight: '700' }
 });

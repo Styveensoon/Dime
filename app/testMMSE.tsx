@@ -2,10 +2,11 @@ import React, { useState, useEffect, useRef } from "react";
 import { 
     StyleSheet, View, TouchableOpacity, TextInput, 
     ActivityIndicator, ScrollView, Image,
-    SafeAreaView, Platform, StatusBar // <-- Importamos los componentes de layout
+    SafeAreaView, Platform, StatusBar, 
+    Alert // <-- 1. Importamos Alert
 } from "react-native";
 import { Audio } from 'expo-av';
-import { useRouter, Stack } from "expo-router"; // <-- Importamos Stack
+import { useRouter, Stack } from "expo-router"; 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { GROQ_KEY } from '../constants';
@@ -50,6 +51,8 @@ export default function TestMMSE() {
     const [grabando, setGrabando] = useState(false);
     const [procesando, setProcesando] = useState(false);
     const [respuestas, setRespuestas] = useState<{ [key: number]: string }>({});
+    
+    const [isFinished, setIsFinished] = useState(false);
 
     // Variables para objetos aleatorios
     const [itemsRegistro, setItemsRegistro] = useState<string[]>([]);
@@ -57,7 +60,6 @@ export default function TestMMSE() {
 
     const grabacionRef = useRef<Audio.Recording | null>(null);
 
-    
     const prepararAudio = async () => {
         await Audio.requestPermissionsAsync();
         await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
@@ -132,13 +134,23 @@ export default function TestMMSE() {
     };
 
     const siguiente = () => {
+        // 2. Validamos que haya una respuesta guardada y no esté vacía
+        const respuestaActual = respuestas[currentQ.id];
+        if (!respuestaActual || respuestaActual.trim() === "") {
+            Alert.alert(
+                "Atención",
+                "Por favor, responde la pregunta actual para poder avanzar."
+            );
+            return; // Si no hay respuesta válida, detenemos la función aquí
+        }
+
         if (paso < preguntas.length - 1) setPaso(paso + 1);
         else finalizar();
     };
 
     const finalizar = () => {
         console.log("Resultados finales:", respuestas);
-        router.replace('/main');
+        setIsFinished(true);
     };
 
     return (
@@ -150,101 +162,124 @@ export default function TestMMSE() {
         >
             <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
             
-            {/* Oculta la barra nativa de navegación de Expo Router */}
             <Stack.Screen options={{ headerShown: false }} />
 
-            {/* Barra superior con el botón Volver */}
-            <View style={s.topBar}>
-                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
-                    <ThemedText style={{ color: C.accent, fontWeight: 'bold', fontSize: 16 }}>← Volver</ThemedText>
-                </TouchableOpacity>
-            </View>
+            {!isFinished && (
+                <View style={s.topBar}>
+                    <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                        <ThemedText style={{ color: C.accent, fontWeight: 'bold', fontSize: 16 }}>← Volver</ThemedText>
+                    </TouchableOpacity>
+                </View>
+            )}
 
             <ScrollView 
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={s.scrollContent}
             >
-                <ThemedView style={s.header}>
-                    <ThemedText type="title" style={{ color: C.accent }}>Test Deterioro Cognitivo</ThemedText>
-                    <ThemedText style={s.progreso}>Pregunta {paso + 1} de {preguntas.length}</ThemedText>
-                </ThemedView>
-
-                <View style={s.card}>
-                    <ThemedText style={s.qTitle}>{currentQ.title}</ThemedText>
-                    <ThemedText style={s.qText}>{currentQ.text}</ThemedText>
-
-                    {currentQ.id === 3 && (
-                        <View style={s.imageGrid}>
-                            {itemsRegistro.map((nombre, index) => (
-                                <View key={index} style={s.imageContainer}>
-                                    <Image source={IMAGENES_REGISTRO[nombre]} style={s.testImage} />
-                                    <ThemedText style={s.imageLabel}>{nombre}</ThemedText>
-                                </View>
-                            ))}
+                {isFinished ? (
+                    <View style={s.completionContainer}>
+                        <ThemedText type="title" style={s.completionTitle}>
+                            ¡Evaluación Completada!
+                        </ThemedText>
+                        
+                        <View style={s.completionCard}>
+                            <ThemedText style={s.completionText}>
+                                Culminaste las pruebas. La experiencia se ajustará en base a tus resultados y los mismos se anexarán a tu expediente médico.
+                            </ThemedText>
                         </View>
-                    )}
 
-                    {currentQ.id === 6 && (
-                        <View style={s.imageGrid}>
-                            {itemsDenominacion.map((nombre, index) => (
-                                <View key={index} style={s.imageContainer}>
-                                    <Image source={IMAGENES_DENOMINACION[nombre]} style={s.testImage} />
-                                </View>
-                            ))}
-                        </View>
-                    )}
+                        <TouchableOpacity 
+                            style={s.acceptBtn} 
+                            onPress={() => router.replace('/main')}
+                        >
+                            <ThemedText style={s.acceptBtnTxt}>Aceptar</ThemedText>
+                        </TouchableOpacity>
+                    </View>
+                ) : (
+                    <>
+                        <ThemedView style={s.header}>
+                            <ThemedText type="title" style={{ color: C.accent }}>Test Deterioro Cognitivo</ThemedText>
+                            <ThemedText style={s.progreso}>Pregunta {paso + 1} de {preguntas.length}</ThemedText>
+                        </ThemedView>
 
-                    {currentQ.tipo === "voz" ? (
-                        <View style={s.vozContainer}>
-                            {procesando ? (
-                                <ActivityIndicator color={C.accent} size="large" />
-                            ) : (
-                                <>
-                                    <View style={s.micWrapper}>
-                                        {grabando && <View style={s.pulseRing} />}
-                                        
-                                        <TouchableOpacity 
-                                            style={[s.micBtn, grabando && s.micBtnActive]} 
-                                            onPressIn={iniciarGrabacion}
-                                            onPressOut={detenerGrabacion}
-                                            activeOpacity={0.7}
-                                        >
-                                            <ThemedText style={s.micIco}>
-                                                {grabando ? "●" : "🎙️"}
-                                            </ThemedText>
-                                        </TouchableOpacity>
-                                    </View>
+                        <View style={s.card}>
+                            <ThemedText style={s.qTitle}>{currentQ.title}</ThemedText>
+                            <ThemedText style={s.qText}>{currentQ.text}</ThemedText>
 
-                                    <ThemedText style={s.vozHint}>
-                                        {grabando ? "Escuchando..." : "Mantén para grabar respuesta"}
-                                    </ThemedText>
-
-                                    {respuestas[currentQ.id] && (
-                                        <View style={s.resultBox}>
-                                            <ThemedText style={s.resultLabel}>Voz: {'"'}{respuestas[currentQ.id]}{'"'}</ThemedText>
+                            {currentQ.id === 3 && (
+                                <View style={s.imageGrid}>
+                                    {itemsRegistro.map((nombre, index) => (
+                                        <View key={index} style={s.imageContainer}>
+                                            <Image source={IMAGENES_REGISTRO[nombre]} style={s.testImage} />
+                                            <ThemedText style={s.imageLabel}>{nombre}</ThemedText>
                                         </View>
+                                    ))}
+                                </View>
+                            )}
+
+                            {currentQ.id === 6 && (
+                                <View style={s.imageGrid}>
+                                    {itemsDenominacion.map((nombre, index) => (
+                                        <View key={index} style={s.imageContainer}>
+                                            <Image source={IMAGENES_DENOMINACION[nombre]} style={s.testImage} />
+                                        </View>
+                                    ))}
+                                </View>
+                            )}
+
+                            {currentQ.tipo === "voz" ? (
+                                <View style={s.vozContainer}>
+                                    {procesando ? (
+                                        <ActivityIndicator color={C.accent} size="large" />
+                                    ) : (
+                                        <>
+                                            <View style={s.micWrapper}>
+                                                {grabando && <View style={s.pulseRing} />}
+                                                
+                                                <TouchableOpacity 
+                                                    style={[s.micBtn, grabando && s.micBtnActive]} 
+                                                    onPressIn={iniciarGrabacion}
+                                                    onPressOut={detenerGrabacion}
+                                                    activeOpacity={0.7}
+                                                >
+                                                    <ThemedText style={s.micIco}>
+                                                        {grabando ? "●" : "🎙️"}
+                                                    </ThemedText>
+                                                </TouchableOpacity>
+                                            </View>
+
+                                            <ThemedText style={s.vozHint}>
+                                                {grabando ? "Escuchando..." : "Mantén para grabar respuesta"}
+                                            </ThemedText>
+
+                                            {respuestas[currentQ.id] && (
+                                                <View style={s.resultBox}>
+                                                    <ThemedText style={s.resultLabel}>Voz: {'"'}{respuestas[currentQ.id]}{'"'}</ThemedText>
+                                                </View>
+                                            )}
+                                        </>
                                     )}
-                                </>
+                                </View>
+                            ) : (
+
+                                <TextInput
+                                    style={s.input}
+                                    placeholder="Resultado numérico..."
+                                    placeholderTextColor={C.textMuted}
+                                    keyboardType="numeric"
+                                    value={respuestas[currentQ.id] || ""}
+                                    onChangeText={(t) => guardarRespuesta(currentQ.id, t)}
+                                />
                             )}
                         </View>
-                    ) : (
 
-                        <TextInput
-                            style={s.input}
-                            placeholder="Resultado numérico..."
-                            placeholderTextColor={C.textMuted}
-                            keyboardType="numeric"
-                            value={respuestas[currentQ.id] || ""}
-                            onChangeText={(t) => guardarRespuesta(currentQ.id, t)}
-                        />
-                    )}
-                </View>
-
-                <TouchableOpacity style={s.nextBtn} onPress={siguiente}>
-                    <ThemedText style={s.nextBtnTxt}>
-                        {paso === preguntas.length - 1 ? "Finalizar Registro" : "Siguiente Pregunta"}
-                    </ThemedText>
-                </TouchableOpacity>
+                        <TouchableOpacity style={s.nextBtn} onPress={siguiente}>
+                            <ThemedText style={s.nextBtnTxt}>
+                                {paso === preguntas.length - 1 ? "Finalizar Registro" : "Siguiente Pregunta"}
+                            </ThemedText>
+                        </TouchableOpacity>
+                    </>
+                )}
             </ScrollView>
         </SafeAreaView>
     );
@@ -412,4 +447,48 @@ const s = StyleSheet.create({
         paddingHorizontal: 20,
         paddingBottom: 40, 
     },
+    completionContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 60,
+    },
+    completionTitle: {
+        color: C.primary,
+        fontSize: 28,
+        fontWeight: 'bold',
+        marginBottom: 30,
+        textAlign: 'center',
+    },
+    completionCard: {
+        backgroundColor: C.surface,
+        padding: 30,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: C.border,
+        elevation: 3,
+        shadowColor: '#000',
+        shadowOpacity: 0.1,
+        shadowRadius: 10,
+        marginBottom: 40,
+        width: '100%',
+    },
+    completionText: {
+        color: C.text,
+        fontSize: 18,
+        textAlign: 'center',
+        lineHeight: 28,
+    },
+    acceptBtn: {
+        backgroundColor: C.primary,
+        padding: 20,
+        borderRadius: 15,
+        alignItems: 'center',
+        width: '100%',
+    },
+    acceptBtnTxt: {
+        color: C.surface,
+        fontWeight: 'bold',
+        fontSize: 18,
+    }
 });
