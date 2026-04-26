@@ -1,9 +1,11 @@
+import { guardarDiario } from '@/app/utils/firebase';
 import { ThemedText } from '@/components/themed-text';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { Link } from 'expo-router';
-import React, { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Link, useRouter } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, TextInput, TouchableOpacity, View } from 'react-native';
 
 interface DiaryEntry {
   id: string;
@@ -16,48 +18,84 @@ interface DiaryEntry {
 export default function DiaryScreen() {
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme ?? 'light'];
+  const router = useRouter();
   
   const [viewMode, setViewMode] = useState<'list' | 'write'>('list');
   const [titulo, setTitulo] = useState('');
   const [contenido, setContenido] = useState('');
   const [emociones, setEmociones] = useState('');
-  const [entries, setEntries] = useState<DiaryEntry[]>([
-    {
-      id: '1',
-      fecha: 'Hoy, 25 de abril',
-      titulo: 'Un día reflexivo',
-      contenido: 'Fue un día productivo. Pude avanzar en mis proyectos...',
-      emociones: ['Feliz', 'Motivado'],
-    },
-  ]);
+  const [entries, setEntries] = useState<DiaryEntry[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState<string>('');
 
   const emotions = ['Feliz', 'Triste', 'Ansioso', 'Relajado', 'Motivado', 'Confundido'];
 
-  const handleSaveEntry = () => {
+  useEffect(() => {
+    const cargarEntradas = async () => {
+      try {
+        const id = await AsyncStorage.getItem('userId');
+        if (id) {
+          setUserId(id);
+          // Cargar entradas de Firebase
+          const url = `https://firestore.googleapis.com/v1/projects/hack-441ef/databases/(default)/documents/usuarios/${id}/diario`;
+          const res = await fetch(`${url}?key=AIzaSyBWg_520tyLRRQZCXCWYNkhS-FCEtmDusA`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.documents) {
+              const loadedEntries = data.documents.map((doc: any) => {
+                const fields = doc.fields;
+                return {
+                  id: doc.name.split('/').pop(),
+                  fecha: fields.fecha?.stringValue || 'Sin fecha',
+                  titulo: fields.titulo?.stringValue || 'Sin título',
+                  contenido: fields.contenido?.stringValue || '',
+                  emociones: fields.emociones?.arrayValue?.values?.map((v: any) => v.stringValue) || [],
+                };
+              });
+              setEntries(loadedEntries.sort((a: any, b: any) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime()));
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error cargando entradas:', error);
+      }
+    };
+    cargarEntradas();
+  }, []);
+
+  const handleSaveEntry = async () => {
     if (!titulo || !contenido) {
       Alert.alert('Error', 'Por favor completa el título y el contenido');
       return;
     }
 
-    const newEntry: DiaryEntry = {
-      id: Date.now().toString(),
-      fecha: new Date().toLocaleDateString('es-MX', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      }),
-      titulo,
-      contenido,
-      emociones: emociones.split(',').map(e => e.trim()).filter(e => e),
-    };
+    setLoading(true);
+    try {
+      const entryId = `entrada_${Date.now()}`;
+      const newEntry: DiaryEntry = {
+        id: entryId,
+        fecha: new Date().toISOString(),
+        titulo,
+        contenido,
+        emociones: emociones.split(',').map(e => e.trim()).filter(e => e),
+      };
 
-    setEntries([newEntry, ...entries]);
-    setTitulo('');
-    setContenido('');
-    setEmociones('');
-    setViewMode('list');
-    Alert.alert('Éxito', 'Entrada guardada en tu diario');
+      // Guardar en Firebase
+      if (userId) {
+        await guardarDiario(userId, newEntry);
+      }
+
+      setEntries([newEntry, ...entries]);
+      setTitulo('');
+      setContenido('');
+      setEmociones('');
+      setViewMode('list');
+      Alert.alert('Éxito', 'Entrada guardada en tu diario');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'No se pudo guardar la entrada');
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (viewMode === 'write') {
@@ -180,10 +218,15 @@ export default function DiaryScreen() {
               </View>
 
               <TouchableOpacity
-                style={[styles.guardarBtn, { backgroundColor: colors.tint }]}
+                style={[styles.guardarBtn, { backgroundColor: colors.tint, opacity: loading ? 0.6 : 1 }]}
                 onPress={handleSaveEntry}
+                disabled={loading}
               >
-                <ThemedText style={styles.guardarText}>Guardar Entrada</ThemedText>
+                {loading ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <ThemedText style={styles.guardarText}>Guardar Entrada</ThemedText>
+                )}
               </TouchableOpacity>
             </View>
           </ScrollView>

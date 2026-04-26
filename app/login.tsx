@@ -1,21 +1,23 @@
+import { leerPerfil } from '@/app/utils/firebase';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Colors } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Link, useRouter } from 'expo-router';
 import React, { useState } from 'react';
-import { 
-  Alert, 
-  SafeAreaView, 
-  ScrollView, 
-  StyleSheet, 
-  TextInput, 
-  TouchableOpacity, 
-  View, 
+import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
-  Platform 
+  Platform,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View
 } from 'react-native';
+import { Buffer } from 'buffer';
 
 // Colores institucionales
 const IMSS_COLORS = {
@@ -44,11 +46,27 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      // Simulación de login
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Usar email como ID de usuario (en base64)
+      const userId = Buffer.from(email).toString('base64');
+      
+      // Verificar que el usuario existe en Firebase
+      const perfil = await leerPerfil(userId);
+      
+      if (!perfil) {
+        Alert.alert('Error', 'Usuario no encontrado. Por favor regístrate primero.');
+        setLoading(false);
+        return;
+      }
+
+      // Guardar sesión localmente
+      await AsyncStorage.setItem('userId', userId);
+      await AsyncStorage.setItem('userEmail', email);
+      await AsyncStorage.setItem('username', perfil.username || '');
+
+      Alert.alert('Éxito', `¡Bienvenido ${perfil.username}!`);
       router.push('/main');
-    } catch (error) {
-      Alert.alert('Error', 'No se pudo iniciar sesión. Verifique sus datos.');
+    } catch (error: any) {
+      Alert.alert('Error', error.message || 'No se pudo iniciar sesión. Verifique sus datos.');
     } finally {
       setLoading(false);
     }

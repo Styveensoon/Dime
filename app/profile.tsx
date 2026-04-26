@@ -1,14 +1,16 @@
 import { ThemedText } from '@/components/themed-text';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter, Stack } from 'expo-router';
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
   SafeAreaView, 
   StyleSheet, 
   View, 
   TouchableOpacity, 
   ScrollView,
-  StatusBar
+  StatusBar,
+  ActivityIndicator
 } from 'react-native';
 
 const IMSS_COLORS = {
@@ -23,30 +25,56 @@ const IMSS_COLORS = {
 export default function ProfileScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
+  
+  // Estado para los datos del usuario
+  const [userData, setUserData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  // Datos simulados del ciudadano
-  const userData = {
-    nombre: "JUAN PÉREZ GONZÁLEZ",
-    nss: "1234-56-7890-1",
-    curp: "PEGO800101HDFRRS01",
-    unidad: "UMF No. 57 - Puebla",
-    consultorio: "04",
-    turno: "Matutino",
-    vigencia: "DERECHOHABIENTE VIGENTE",
-    tipo: "Trabajador Permanente"
-  };
+  useEffect(() => {
+    const cargarInfoPerfil = async () => {
+      try {
+        // Recuperamos los datos que guardamos en Signup
+        const nombre = await AsyncStorage.getItem('username');
+        const nss = await AsyncStorage.getItem('userNss');
+        const email = await AsyncStorage.getItem('userEmail');
+        
+        // Formateamos el NSS para que se vea institucional (opcional)
+        const nssFormateado = nss ? `${nss.substring(0,4)}-${nss.substring(4,6)}-${nss.substring(6,10)}-${nss.substring(10,11)}` : 'No asignado';
+
+        setUserData({
+          nombre: nombre?.toUpperCase() || "USUARIO NO REGISTRADO",
+          nss: nssFormateado,
+          email: email || "Sin correo",
+          curp: "GENERANDO...", // Estos datos podrías pedirlos en el signup después
+          unidad: "Unidad Pendiente",
+          turno: "No asignado",
+          vigencia: "DERECHOs VIGENTES",
+          tipo: "Cuenta Digital"
+        });
+      } catch (error) {
+        console.error("Error al cargar perfil:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    cargarInfoPerfil();
+  }, []);
+
+  if (loading) {
+    return (
+      <View style={{ flex: 1, justifyContent: 'center', backgroundColor: isDark ? '#121212' : IMSS_COLORS.lightGray }}>
+        <ActivityIndicator size="large" color={IMSS_COLORS.green} />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#121212' : IMSS_COLORS.lightGray }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       
-      {/* Configuración de la barra de navegación nativa */}
-      <Stack.Screen options={{ 
-        headerShown: false,
-        title: 'Mi Perfil' 
-      }} />
+      <Stack.Screen options={{ headerShown: false }} />
 
-      {/* Header Personalizado */}
       <View style={[styles.header, { backgroundColor: isDark ? '#1A1A1A' : IMSS_COLORS.white }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ThemedText style={{ color: IMSS_COLORS.gold, fontWeight: 'bold', fontSize: 16 }}>← Volver</ThemedText>
@@ -56,11 +84,10 @@ export default function ProfileScreen() {
 
       <ScrollView contentContainerStyle={styles.content}>
         
-        {/* Tarjeta de Identificación Digital */}
         <View style={[styles.idCard, { backgroundColor: isDark ? '#1E1E1E' : '#FFF' }]}>
           <View style={styles.cardHeader}>
             <View style={styles.avatarContainer}>
-              <ThemedText style={styles.avatarText}>DH</ThemedText>
+              <ThemedText style={styles.avatarText}>{userData.nombre.substring(0,2)}</ThemedText>
             </View>
             <View style={styles.statusBadge}>
               <ThemedText style={styles.statusText}>{userData.vigencia}</ThemedText>
@@ -80,23 +107,21 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Detalles Adicionales */}
         <View style={styles.detailsSection}>
           <ThemedText style={styles.sectionTitle}>Información de Afiliación</ThemedText>
           
-          <InfoItem label="CURP" value={userData.curp} isDark={isDark} />
+          <InfoItem label="Correo Electrónico" value={userData.email} isDark={isDark} />
+          <InfoItem label="Estado de Cuenta" value="Activo" isDark={isDark} />
           <InfoItem label="Unidad de Medicina Familiar" value={userData.unidad} isDark={isDark} />
-          <InfoItem label="Consultorio Asignado" value={userData.consultorio} isDark={isDark} />
           <InfoItem label="Turno" value={userData.turno} isDark={isDark} />
         </View>
 
-        {/* Aviso de Privacidad / Seguridad */}
         <View style={styles.footerNote}>
           <ThemedText style={styles.footerNoteText}>
-            Esta es una identificación digital oficial. Los datos mostrados están protegidos por la Ley General de Protección de Datos Personales.
+            Esta es una identificación digital basada en tu registro exitoso en Firebase.
           </ThemedText>
           <TouchableOpacity style={styles.btnCertificado}>
-            <ThemedText style={styles.btnCertificadoText}>Descargar Vigencia de Derechos</ThemedText>
+            <ThemedText style={styles.btnCertificadoText}>Generar Constancia Digital</ThemedText>
           </TouchableOpacity>
         </View>
 
@@ -105,7 +130,6 @@ export default function ProfileScreen() {
   );
 }
 
-// Componente pequeño para cada fila de información
 function InfoItem({ label, value, isDark }: { label: string, value: string, isDark: boolean }) {
   return (
     <View style={[styles.infoItem, { borderBottomColor: isDark ? '#333' : '#E0E0E0' }]}>
@@ -115,6 +139,7 @@ function InfoItem({ label, value, isDark }: { label: string, value: string, isDa
   );
 }
 
+// ... (Mismos estilos que ya tenías)
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
@@ -123,10 +148,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
   },
   backButton: { paddingVertical: 5, paddingRight: 15 },
   headerTitle: { fontSize: 20, fontWeight: '800' },
@@ -136,10 +157,6 @@ const styles = StyleSheet.create({
     padding: 20,
     marginBottom: 25,
     elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
     borderLeftWidth: 6,
     borderLeftColor: IMSS_COLORS.gold,
   },
