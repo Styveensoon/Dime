@@ -1,7 +1,7 @@
 import { ThemedText } from '@/components/themed-text';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { Link, useRouter } from 'expo-router';
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   SafeAreaView, 
   ScrollView, 
@@ -11,6 +11,7 @@ import {
   Dimensions,
   StatusBar
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
@@ -18,112 +19,107 @@ const IMSS_COLORS = {
   green: '#1F4529',
   gold: '#B38E5D',
   gray: '#6F7271',
-  lightGray: '#F4F4F4',
   white: '#FFFFFF',
+  softGray: '#F9F9F9',
 };
 
-// Definición de los servicios del menú
+// Asegúrate de que estas rutas existan en tu carpeta (app/tests/index.tsx, etc.)
 const MENU_ITEMS = [
-  { 
-    id: 'tests', 
-    titulo: 'Evaluaciones', 
-    subtitulo: 'IA y Diagnóstico', 
-    icon: '📋', 
-    ruta: '/tests' 
-  },
-  { 
-    id: 'chatbot', 
-    titulo: 'Asistente Virtual', 
-    subtitulo: 'Chat con Claude', 
-    icon: '💬', 
-    ruta: '/chat' 
-  },
-  { 
-    id: 'diario', 
-    titulo: 'Seguimiento', 
-    subtitulo: 'Mi Diario Personal', 
-    icon: '📔', 
-    ruta: '/diary' 
-  },
-  { 
-    id: 'recursos', 
-    titulo: 'Recursos', 
-    subtitulo: 'Directorio de Ayuda', 
-    icon: '📞', 
-    ruta: '/resources' 
-  },
+  { id: 'tests', titulo: 'Evaluaciones', subtitulo: 'IA y Diagnóstico', icon: '📋', ruta: '/tests' },
+  { id: 'chatbot', titulo: 'Asistente Virtual', subtitulo: 'Chat con Claude', icon: '💬', ruta: '/chat' },
+  { id: 'diario', titulo: 'Seguimiento', subtitulo: 'Mi Diario Personal', icon: '📔', ruta: '/diary' },
+  { id: 'recursos', titulo: 'Recursos', subtitulo: 'Directorio de Ayuda', icon: '📞', ruta: '/resources' },
 ] as const;
 
 export default function MainScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
+  const [username, setUsername] = useState('Derechohabiente');
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const storedName = await AsyncStorage.getItem('username');
+        if (storedName) setUsername(storedName);
+      } catch (e) {
+        console.error("Error cargando el nombre", e);
+      }
+    };
+    loadUser();
+  }, []);
+
+  const userInitial = username.charAt(0).toUpperCase();
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#121212' : IMSS_COLORS.lightGray }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#121212' : IMSS_COLORS.white }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        {/* Header Superior: Saludo y Perfil */}
         <View style={styles.topHeader}>
           <View>
-            <ThemedText style={styles.welcomeText}>Bienvenido,</ThemedText>
+            <ThemedText style={styles.welcomeLabel}>Bienvenido,</ThemedText>
             <ThemedText type="title" style={[styles.userName, { color: isDark ? '#FFF' : IMSS_COLORS.green }]}>
-              Derechohabiente
+              {username}
             </ThemedText>
           </View>
           
           <Link href="/profile" asChild>
-            <TouchableOpacity style={styles.profileBadge}>
-              <ThemedText style={styles.badgeText}>DH</ThemedText>
+            <TouchableOpacity style={styles.profileCircle}>
+              <ThemedText style={styles.initialText}>{userInitial}</ThemedText>
             </TouchableOpacity>
           </Link>
         </View>
 
-        {/* Banner de Acción Rápida (Invitación a Test) */}
+        {/* Banner de Acción Principal - CORREGIDO EL PUSH */}
         <TouchableOpacity 
-          style={[styles.statusBanner, { backgroundColor: IMSS_COLORS.green }]}
+          style={styles.heroBanner}
           onPress={() => router.push('/tests')}
-          activeOpacity={0.9}
+          activeOpacity={0.8}
         >
-          <View style={styles.statusContent}>
-            <ThemedText style={styles.statusTitle}>¿Cómo te sientes hoy?</ThemedText>
-            <ThemedText style={styles.statusSub}>Realiza una evaluación rápida analizada por nuestra IA.</ThemedText>
+          <View style={styles.heroContent}>
+            <ThemedText style={styles.heroTitle}>¿Cómo te sientes hoy?</ThemedText>
+            <ThemedText style={styles.heroSub}>Completa tu evaluación de bienestar asistida por IA.</ThemedText>
           </View>
-          <View style={styles.statusButton}>
-            <ThemedText style={styles.statusButtonText}>IR</ThemedText>
+          <View style={styles.heroAction}>
+            <ThemedText style={styles.heroActionText}>→</ThemedText>
           </View>
         </TouchableOpacity>
 
-        <ThemedText style={styles.sectionTitle}>Servicios Disponibles</ThemedText>
+        <View style={styles.sectionHeader}>
+          <ThemedText style={styles.sectionTitle}>Servicios Digitales</ThemedText>
+          <View style={styles.goldLine} />
+        </View>
 
-        {/* Grid de Menú (AQUÍ ESTÁN TUS BOTONES DE VUELTA) */}
         <View style={styles.menuGrid}>
           {MENU_ITEMS.map((item) => (
             <TouchableOpacity 
               key={item.id} 
-              style={[styles.gridItem, { backgroundColor: isDark ? '#1E1E1E' : IMSS_COLORS.white }]}
-              onPress={() => router.push(item.ruta)}
+              style={[styles.gridCard, { backgroundColor: isDark ? '#1E1E1E' : IMSS_COLORS.softGray }]}
+              onPress={() => {
+                // Validación de ruta antes de navegar
+                if (item.ruta) {
+                  router.push(item.ruta as any);
+                }
+              }}
+              activeOpacity={0.7}
             >
-              <View style={[styles.iconContainer, { backgroundColor: isDark ? '#2A2A2A' : '#F0F4F1' }]}>
-                <ThemedText style={styles.iconText}>{item.icon}</ThemedText>
+              <View style={[styles.iconWrapper, { backgroundColor: isDark ? '#2A2A2A' : '#FFF' }]}>
+                <ThemedText style={styles.iconEmoji}>{item.icon}</ThemedText>
               </View>
-              <ThemedText style={[styles.itemTitle, { color: isDark ? '#FFF' : IMSS_COLORS.green }]}>
+              <ThemedText style={[styles.cardTitle, { color: isDark ? '#FFF' : IMSS_COLORS.green }]}>
                 {item.titulo}
               </ThemedText>
-              <ThemedText style={styles.itemSub}>{item.subtitulo}</ThemedText>
-              
-              <View style={styles.itemArrow}>
-                <ThemedText style={{ color: IMSS_COLORS.gold, fontWeight: '900' }}>→</ThemedText>
+              <ThemedText style={styles.cardSub}>{item.subtitulo}</ThemedText>
+              <View style={styles.cardFooter}>
+                <ThemedText style={styles.cardLink}>Acceder</ThemedText>
               </View>
             </TouchableOpacity>
           ))}
         </View>
 
-        {/* Footer Institucional */}
         <View style={styles.footer}>
-          <ThemedText style={styles.versionText}>© 2026 IMSS Digital</ThemedText>
-          <ThemedText style={styles.versionText}>Seguridad Social para todos</ThemedText>
+          <ThemedText style={styles.footerText}>© 2026 IMSS Digital</ThemedText>
         </View>
 
       </ScrollView>
@@ -133,81 +129,67 @@ export default function MainScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { padding: 20 },
+  scrollContent: { paddingHorizontal: 25, paddingTop: 20, paddingBottom: 40 },
   topHeader: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
     alignItems: 'center', 
-    marginBottom: 25,
-    marginTop: 10 
+    marginBottom: 35 
   },
-  welcomeText: { fontSize: 16, color: IMSS_COLORS.gray },
-  userName: { fontSize: 24, fontWeight: '800' },
-  profileBadge: { 
-    width: 50, 
-    height: 50, 
-    borderRadius: 25, 
-    backgroundColor: IMSS_COLORS.gold, 
+  welcomeLabel: { fontSize: 16, color: IMSS_COLORS.gray, fontWeight: '500' },
+  userName: { fontSize: 28, fontWeight: '800', letterSpacing: -0.5 },
+  profileCircle: { 
+    width: 55, 
+    height: 55, 
+    borderRadius: 27.5,
+    backgroundColor: IMSS_COLORS.green,
     justifyContent: 'center', 
     alignItems: 'center',
-    elevation: 3
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 2 }
   },
-  badgeText: { color: '#FFF', fontWeight: 'bold' },
-  statusBanner: { 
+  initialText: { color: '#FFF', fontWeight: 'bold', fontSize: 22 },
+  heroBanner: { 
+    backgroundColor: IMSS_COLORS.green,
+    padding: 24, 
+    borderRadius: 24, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginBottom: 40,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 10
+  },
+  heroContent: { flex: 1 },
+  heroTitle: { color: '#FFF', fontSize: 20, fontWeight: '800' },
+  heroSub: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 6 },
+  heroAction: { 
+    backgroundColor: 'rgba(255,255,255,0.2)', 
+    width: 44, height: 44, borderRadius: 15, 
+    justifyContent: 'center', alignItems: 'center', marginLeft: 15
+  },
+  heroActionText: { color: '#FFF', fontSize: 24, fontWeight: 'bold' },
+  sectionHeader: { marginBottom: 20 },
+  sectionTitle: { fontSize: 13, fontWeight: '800', color: IMSS_COLORS.gray, textTransform: 'uppercase' },
+  goldLine: { height: 3, width: 30, backgroundColor: IMSS_COLORS.gold, marginTop: 6 },
+  menuGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+  gridCard: { 
+    width: (width - 65) / 2, 
     padding: 20, 
-    borderRadius: 15, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    marginBottom: 30,
-    elevation: 4 
-  },
-  statusContent: { flex: 1 },
-  statusTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
-  statusSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 5 },
-  statusButton: { 
-    backgroundColor: IMSS_COLORS.gold, 
-    width: 40, 
-    height: 40, 
-    borderRadius: 20, 
-    justifyContent: 'center', 
-    alignItems: 'center',
-    marginLeft: 10
-  },
-  statusButtonText: { color: '#FFF', fontWeight: '900' },
-  sectionTitle: { 
-    fontSize: 14, 
-    fontWeight: '800', 
-    color: IMSS_COLORS.gray, 
-    textTransform: 'uppercase', 
+    borderRadius: 24, 
     marginBottom: 15,
-    letterSpacing: 1
+    minHeight: 180 
   },
-  menuGrid: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
-    justifyContent: 'space-between' 
-  },
-  gridItem: { 
-    width: (width - 55) / 2, 
-    padding: 16, 
-    borderRadius: 15, 
-    marginBottom: 15,
-    elevation: 2,
-    borderLeftWidth: 4,
-    borderLeftColor: IMSS_COLORS.gold
-  },
-  iconContainer: { 
-    width: 45, 
-    height: 45, 
-    borderRadius: 10, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginBottom: 12 
-  },
-  iconText: { fontSize: 24 },
-  itemTitle: { fontSize: 15, fontWeight: '700' },
-  itemSub: { fontSize: 11, color: IMSS_COLORS.gray, marginTop: 4 },
-  itemArrow: { marginTop: 10, alignSelf: 'flex-end' },
-  footer: { marginTop: 20, alignItems: 'center', paddingBottom: 30 },
-  versionText: { fontSize: 11, color: IMSS_COLORS.gray }
+  iconWrapper: { width: 48, height: 48, borderRadius: 14, justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
+  iconEmoji: { fontSize: 22 },
+  cardTitle: { fontSize: 15, fontWeight: '700' },
+  cardSub: { fontSize: 11, color: IMSS_COLORS.gray, marginTop: 4, height: 32 },
+  cardFooter: { marginTop: 12 },
+  cardLink: { fontSize: 12, fontWeight: '800', color: IMSS_COLORS.gold },
+  footer: { marginTop: 30, alignItems: 'center', opacity: 0.5 },
+  footerText: { fontSize: 10, color: IMSS_COLORS.gray }
 });

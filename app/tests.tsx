@@ -1,12 +1,16 @@
-import React from 'react';
-import { 
-  ScrollView, StyleSheet, TouchableOpacity, 
-  View, Alert, StatusBar, Dimensions 
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { useRouter, Stack } from 'expo-router';
 import { ThemedText } from '@/components/themed-text';
 import { useColorScheme } from '@/hooks/use-color-scheme';
+import { useRouter } from 'expo-router';
+import React from 'react';
+import { 
+  SafeAreaView, 
+  ScrollView, 
+  StyleSheet, 
+  TouchableOpacity, 
+  View, 
+  Dimensions,
+  StatusBar
+} from 'react-native';
 
 const { width } = Dimensions.get('window');
 
@@ -14,90 +18,83 @@ const IMSS_COLORS = {
   green: '#1F4529',
   gold: '#B38E5D',
   gray: '#6F7271',
-  lightGray: '#F4F4F4',
+  white: '#FFFFFF',
+  softGray: '#F5F5F5',
 };
 
-// --- CATÁLOGO DE CONTENIDO CON RUTAS REALES ---
-const CATALOGO_TESTS = [
-  { 
-    id: 'gad7', 
-    titulo: 'Test GAD-7', 
-    desc: 'Evaluación inicial de Ansiedad.', 
-    icon: '🌊', 
-    color: '#FFF3E0', 
-    route: '/testGAD7' // Ruta al archivo testGAD7.tsx
-  },
-  { 
-    id: 'phq9', 
-    titulo: 'Test PHQ-9', 
-    desc: 'Detección de síntomas de depresión.', 
-    icon: '🍃', 
-    color: '#F1F8E9', 
-    route: '/PHQ9' // Ruta al archivo PHQ9.tsx
-  },
-  { 
-    id: 'mmse', 
-    titulo: 'Examen MMSE', 
-    desc: 'Mini-Examen del Estado Mental.', 
-    icon: '📋', 
-    color: '#EDE7F6', 
-    route: '/testMMSE' // Ruta al archivo testMMSE.tsx
-  },
+// --- GRUPO 1: SALUD MENTAL (Tests Clínicos) ---
+const MENTAL_HEALTH = [
+  { id: 'gad7', titulo: 'Ansiedad', subtitulo: 'Escala GAD-7', icon: '🧘', ruta: '/testGAD7' },
+  { id: 'phq9', titulo: 'Depresión', subtitulo: 'Escala PHQ-9', icon: '📉', ruta: '/testPHQ9' },
+  { id: 'pss', titulo: 'Estrés', subtitulo: 'Escala PSS', icon: '🌋', ruta: '/testPSS' },
 ];
 
-export default function TestsScreen() {
+// --- GRUPO 2: COGNICIÓN (Actividades Mentales) ---
+const COGNITION = [
+  { id: 'mem', titulo: 'Memoria', subtitulo: 'Reto de Retención', icon: '🧠', ruta: '/ejercicios/memoria' },
+  { id: 'foc', titulo: 'Atención', subtitulo: 'Enfoque Selectivo', icon: '🎯', ruta: '/ejercicios/atencion' },
+  { id: 'log', titulo: 'Lógica', subtitulo: 'Razonamiento', icon: '🧩', ruta: '/ejercicios/logica' },
+];
+
+export default function UnifiedExercisesScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
 
-  // Esta función ahora sí te manda al test que elijas
-  const handleStartTest = (route: string) => {
-    router.push(route as any);
-  };
-
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#121212' : IMSS_COLORS.lightGray }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-      <Stack.Screen options={{ headerShown: false }} />
+  const renderCard = (item: any, accentColor: string) => (
+    <TouchableOpacity 
+      key={item.id} 
+      style={[styles.card, { backgroundColor: isDark ? '#1E1E1E' : IMSS_COLORS.softGray }]}
+      onPress={() => router.push(item.ruta as any)}
+      activeOpacity={0.7}
+    >
+      <View style={[styles.iconContainer, { backgroundColor: isDark ? '#2A2A2A' : '#FFF' }]}>
+        <ThemedText style={styles.largeEmoji}>{item.icon}</ThemedText>
+      </View>
       
-      <View style={[styles.header, { backgroundColor: isDark ? '#1A1A1A' : '#FFF' }]}>
-        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
-          <ThemedText style={{ color: IMSS_COLORS.gold, fontWeight: 'bold' }}>← Volver</ThemedText>
-        </TouchableOpacity>
-        <ThemedText type="title" style={[styles.headerTitle, { color: IMSS_COLORS.green }]}>Biblioteca Salud</ThemedText>
+      <View style={styles.cardContent}>
+        <ThemedText style={[styles.cardTitle, { color: isDark ? '#FFF' : IMSS_COLORS.green }]}>
+          {item.titulo}
+        </ThemedText>
+        <ThemedText style={styles.cardSub}>{item.subtitulo}</ThemedText>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <View style={[styles.footerLine, { backgroundColor: accentColor }]} />
+    </TouchableOpacity>
+  );
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#121212' : IMSS_COLORS.white }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        <View style={styles.sectionHeader}>
-          <ThemedText style={styles.sectionTitle}>Evaluaciones Disponibles</ThemedText>
+        <View style={styles.header}>
+          <ThemedText type="title" style={[styles.headerTitle, { color: isDark ? '#FFF' : IMSS_COLORS.green }]}>
+            Evaluación Integral
+          </ThemedText>
+          <ThemedText style={styles.headerSub}>Módulos de diagnóstico y entrenamiento.</ThemedText>
         </View>
 
-        <View style={styles.grid}>
-          {CATALOGO_TESTS.map((test) => (
-            <TouchableOpacity 
-              key={test.id} 
-              style={[styles.testCard, { backgroundColor: isDark ? '#1E1E1E' : '#FFF' }]}
-              onPress={() => handleStartTest(test.route)}
-            >
-              <View style={[styles.iconCircle, { backgroundColor: isDark ? '#2A2A2A' : test.color }]}>
-                <ThemedText style={styles.cardIcon}>{test.icon}</ThemedText>
-              </View>
-              <ThemedText style={[styles.cardTitle, { color: isDark ? '#FFF' : IMSS_COLORS.green }]}>
-                {test.titulo}
-              </ThemedText>
-              <ThemedText style={styles.cardDesc}>{test.desc}</ThemedText>
-              <ThemedText style={styles.actionText}>INICIAR AHORA</ThemedText>
-            </TouchableOpacity>
-          ))}
+        {/* SECCIÓN SALUD MENTAL */}
+        <View style={styles.section}>
+          <View style={styles.sectionTitleRow}>
+            <ThemedText style={styles.sectionLabel}>Salud Mental</ThemedText>
+            <View style={styles.dot} />
+          </View>
+          <View style={styles.grid}>
+            {MENTAL_HEALTH.map(item => renderCard(item, IMSS_COLORS.gold))}
+          </View>
         </View>
 
-        {/* Sección de ayuda rápida */}
-        <TouchableOpacity 
-          style={styles.emergencyCard}
-          onPress={() => router.push('/resources')}
-        >
-          <ThemedText style={styles.emergencyText}>¿Necesitas ayuda inmediata? 🆘</ThemedText>
-        </TouchableOpacity>
+        {/* SECCIÓN COGNICIÓN */}
+        <View style={styles.section}>
+          <View style={styles.sectionTitleRow}>
+            <ThemedText style={styles.sectionLabel}>Cognición y Agilidad</ThemedText>
+            <View style={styles.dot} />
+          </View>
+          <View style={styles.grid}>
+            {COGNITION.map(item => renderCard(item, IMSS_COLORS.green))}
+          </View>
+        </View>
 
       </ScrollView>
     </SafeAreaView>
@@ -106,29 +103,54 @@ export default function TestsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: { padding: 20, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderBottomColor: '#EEE' },
-  backButton: { marginRight: 20 },
-  headerTitle: { fontSize: 18, fontWeight: '800' },
-  content: { padding: 20 },
-  sectionHeader: { marginBottom: 20 },
-  sectionTitle: { fontSize: 14, fontWeight: '800', color: IMSS_COLORS.gray, textTransform: 'uppercase' },
-  grid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  testCard: { 
-    width: (width - 55) / 2, 
-    padding: 16, 
-    borderRadius: 20, 
-    marginBottom: 15, 
+  scrollContent: { paddingHorizontal: 25, paddingTop: 30, paddingBottom: 50 },
+  header: { marginBottom: 35 },
+  headerTitle: { fontSize: 30, fontWeight: '900' },
+  headerSub: { fontSize: 15, color: IMSS_COLORS.gray, marginTop: 4 },
+  
+  section: { marginBottom: 30 },
+  sectionTitleRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 15, gap: 8 },
+  sectionLabel: { fontSize: 14, fontWeight: '800', color: IMSS_COLORS.gray, textTransform: 'uppercase', letterSpacing: 1 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: IMSS_COLORS.gold },
+
+  grid: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    justifyContent: 'space-between' 
+  },
+  card: { 
+    width: (width - 65) / 2, 
+    borderRadius: 28, 
+    marginBottom: 15,
+    minHeight: 180,
+    padding: 20,
+    justifyContent: 'space-between',
     elevation: 3,
     shadowColor: '#000',
-    shadowOpacity: 0.1,
-    borderWidth: 1,
-    borderColor: '#F0F0F0'
+    shadowOpacity: 0.05,
+    shadowRadius: 10
   },
-  iconCircle: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  cardIcon: { fontSize: 24 },
-  cardTitle: { fontSize: 13, fontWeight: '800', marginBottom: 5 },
-  cardDesc: { fontSize: 10, color: IMSS_COLORS.gray, marginBottom: 12 },
-  actionText: { fontSize: 10, fontWeight: '900', color: IMSS_COLORS.gold },
-  emergencyCard: { marginTop: 20, padding: 20, borderRadius: 15, backgroundColor: '#FFF', alignItems: 'center', borderWidth: 1, borderColor: '#FFEBEE' },
-  emergencyText: { color: '#D32F2F', fontWeight: 'bold' }
+  iconContainer: { 
+    width: 65, 
+    height: 65, 
+    borderRadius: 20, 
+    justifyContent: 'center', 
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2
+  },
+  largeEmoji: { fontSize: 32 }, // EMOJIS MÁS GRANDES
+  cardContent: { marginTop: 15 },
+  cardTitle: { fontSize: 17, fontWeight: '800' },
+  cardSub: { fontSize: 11, color: IMSS_COLORS.gray, marginTop: 4, fontWeight: '600' },
+  footerLine: { 
+    height: 4, 
+    width: '40%', 
+    borderRadius: 2, 
+    marginTop: 15,
+    opacity: 0.8
+  }
 });

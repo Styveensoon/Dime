@@ -15,11 +15,11 @@ import {
   StyleSheet,
   TextInput,
   TouchableOpacity,
-  View
+  View,
+  StatusBar
 } from 'react-native';
 import { Buffer } from 'buffer';
 
-// Colores institucionales
 const IMSS_COLORS = {
   green: '#1F4529',
   gold: '#B38E5D',
@@ -31,13 +31,14 @@ const IMSS_COLORS = {
 export default function LoginScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === 'dark';
-  const colors = Colors[colorScheme ?? 'light'];
   const router = useRouter();
   
+  // VARIABLES ORIGINALES SIN CAMBIOS
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // LÓGICA ORIGINAL SIN CAMBIOS
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert('Atención', 'Por favor completa tus credenciales de acceso.');
@@ -46,10 +47,7 @@ export default function LoginScreen() {
 
     setLoading(true);
     try {
-      // Usar email como ID de usuario (en base64)
       const userId = Buffer.from(email).toString('base64');
-      
-      // Verificar que el usuario existe en Firebase
       const perfil = await leerPerfil(userId);
       
       if (!perfil) {
@@ -58,7 +56,6 @@ export default function LoginScreen() {
         return;
       }
 
-      // Guardar sesión localmente
       await AsyncStorage.setItem('userId', userId);
       await AsyncStorage.setItem('userEmail', email);
       await AsyncStorage.setItem('username', perfil.username || '');
@@ -74,6 +71,7 @@ export default function LoginScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#121212' : IMSS_COLORS.white }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
       <KeyboardAvoidingView 
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
         style={{ flex: 1 }}
@@ -82,28 +80,27 @@ export default function LoginScreen() {
           contentContainerStyle={styles.scrollContent} 
           showsVerticalScrollIndicator={false}
         >
-          {/* Header Institucional */}
+          {/* Header Minimalista */}
           <View style={styles.headerSection}>
-            <View style={styles.logoPlaceholder}>
+            <View style={styles.logoSquare}>
               <ThemedText style={styles.logoText}>IMSS</ThemedText>
             </View>
-            <ThemedText type="title" style={[styles.title, { color: IMSS_COLORS.green }]}>
+            <ThemedText type="title" style={[styles.title, { color: isDark ? '#FFF' : IMSS_COLORS.green }]}>
               Bienvenido
             </ThemedText>
-            <View style={styles.divider} />
             <ThemedText style={[styles.subtitle, { color: IMSS_COLORS.gray }]}>
-              Identifícate para acceder a tus servicios
+              Acceso a Salud Digital
             </ThemedText>
           </View>
 
-          {/* Formulario */}
+          {/* Formulario Estilizado */}
           <View style={styles.formSection}>
-            <View>
+            <View style={styles.inputContainer}>
               <ThemedText style={styles.label}>Correo Electrónico</ThemedText>
               <TextInput
                 style={[
                   styles.input,
-                  { backgroundColor: isDark ? '#222' : IMSS_COLORS.lightGray }
+                  { backgroundColor: isDark ? '#1E1E1E' : IMSS_COLORS.lightGray, color: isDark ? '#FFF' : '#000' }
                 ]}
                 placeholder="ejemplo@correo.com"
                 placeholderTextColor="#999"
@@ -115,12 +112,12 @@ export default function LoginScreen() {
               />
             </View>
 
-            <View>
+            <View style={styles.inputContainer}>
               <ThemedText style={styles.label}>Contraseña</ThemedText>
               <TextInput
                 style={[
                   styles.input,
-                  { backgroundColor: isDark ? '#222' : IMSS_COLORS.lightGray }
+                  { backgroundColor: isDark ? '#1E1E1E' : IMSS_COLORS.lightGray, color: isDark ? '#FFF' : '#000' }
                 ]}
                 placeholder="••••••••"
                 placeholderTextColor="#999"
@@ -132,34 +129,32 @@ export default function LoginScreen() {
             </View>
 
             <Link href="/forgot-password" asChild>
-              <TouchableOpacity style={styles.forgotContainer}>
-                <ThemedText style={[styles.forgotLink, { color: IMSS_COLORS.green }]}>
+              <TouchableOpacity style={styles.forgotBtn}>
+                <ThemedText style={[styles.forgotLink, { color: IMSS_COLORS.gold }]}>
                   ¿Olvidaste tu contraseña?
                 </ThemedText>
               </TouchableOpacity>
             </Link>
 
             <TouchableOpacity
-              style={[styles.button, { backgroundColor: IMSS_COLORS.green }]}
+              style={[styles.mainButton, { backgroundColor: IMSS_COLORS.green }]}
               onPress={handleLogin}
               disabled={loading}
             >
               {loading ? (
                 <ActivityIndicator color="#FFF" />
               ) : (
-                <ThemedText style={styles.buttonText}>Iniciar Sesión</ThemedText>
+                <ThemedText style={styles.buttonText}>Entrar</ThemedText>
               )}
             </TouchableOpacity>
 
-            {/* Footer de Registro */}
-            <View style={styles.signupContainer}>
-              <ThemedText style={{ color: IMSS_COLORS.gray }}>
-                ¿No tienes una cuenta aún?
-              </ThemedText>
+            {/* Registro */}
+            <View style={styles.signupBox}>
+              <ThemedText style={{ color: IMSS_COLORS.gray }}>¿No tienes cuenta?</ThemedText>
               <Link href="/signup" asChild>
                 <TouchableOpacity>
                   <ThemedText style={[styles.signupLink, { color: IMSS_COLORS.green }]}>
-                    Regístrate aquí
+                    Regístrate
                   </ThemedText>
                 </TouchableOpacity>
               </Link>
@@ -172,101 +167,69 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 30,
-    paddingVertical: 40,
+  container: { flex: 1 },
+  scrollContent: { 
+    flexGrow: 1, 
+    paddingHorizontal: 35, 
     justifyContent: 'center',
+    paddingVertical: 40 
   },
-  headerSection: {
-    alignItems: 'flex-start',
-    marginBottom: 40,
+  headerSection: { 
+    alignItems: 'center', 
+    marginBottom: 50 
   },
-  logoPlaceholder: {
-    width: 60,
-    height: 60,
-    backgroundColor: IMSS_COLORS.green,
-    borderRadius: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
+  logoSquare: { 
+    width: 55, 
+    height: 55, 
+    backgroundColor: IMSS_COLORS.green, 
+    borderRadius: 15, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
     marginBottom: 20,
-  },
-  logoText: {
-    color: '#FFF',
-    fontWeight: '900',
-    fontSize: 18,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  divider: {
-    height: 4,
-    width: 40,
-    backgroundColor: IMSS_COLORS.gold,
-    marginBottom: 15,
-    borderRadius: 2,
-  },
-  subtitle: {
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  formSection: {
-    gap: 20,
-  },
-  label: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: IMSS_COLORS.gray,
-    marginBottom: 8,
-    textTransform: 'uppercase',
-  },
-  input: {
-    height: 55,
-    borderRadius: 4,
-    paddingHorizontal: 15,
-    fontSize: 16,
-    borderBottomWidth: 2,
-    borderBottomColor: IMSS_COLORS.gold,
-  },
-  forgotContainer: {
-    alignSelf: 'flex-end',
-  },
-  forgotLink: {
-    fontSize: 14,
-    fontWeight: '600',
-    textDecorationLine: 'underline',
-  },
-  button: {
-    height: 55,
-    borderRadius: 4,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 10,
-    elevation: 3,
+    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowOpacity: 0.1,
+    shadowRadius: 10
   },
-  buttonText: {
+  logoText: { color: '#FFF', fontWeight: '900', fontSize: 16 },
+  title: { fontSize: 32, fontWeight: '800', marginBottom: 5 },
+  subtitle: { fontSize: 16, fontWeight: '500' },
+  formSection: { gap: 20 },
+  inputContainer: { gap: 8 },
+  label: { 
+    fontSize: 12, 
+    fontWeight: '700', 
+    color: IMSS_COLORS.green, 
+    marginLeft: 5,
+    textTransform: 'uppercase' 
+  },
+  input: { 
+    height: 60, 
+    borderRadius: 18, 
+    paddingHorizontal: 20, 
     fontSize: 16,
-    fontWeight: '700',
-    color: '#fff',
-    textTransform: 'uppercase',
+    borderWidth: 1,
+    borderColor: 'transparent'
   },
-  signupContainer: {
-    marginTop: 30,
-    alignItems: 'center',
-    gap: 5,
+  forgotBtn: { alignSelf: 'flex-end', marginTop: -5 },
+  forgotLink: { fontSize: 14, fontWeight: '600' },
+  mainButton: { 
+    height: 60, 
+    borderRadius: 18, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginTop: 15,
+    elevation: 4,
+    shadowColor: IMSS_COLORS.green,
+    shadowOpacity: 0.3,
+    shadowRadius: 8
   },
-  signupLink: {
-    fontSize: 15,
-    fontWeight: '700',
-    textDecorationLine: 'underline',
+  buttonText: { fontSize: 18, fontWeight: '700', color: '#FFF' },
+  signupBox: { 
+    marginTop: 25, 
+    flexDirection: 'row', 
+    justifyContent: 'center', 
+    gap: 8 
   },
+  signupLink: { fontSize: 15, fontWeight: '700' }
 });
