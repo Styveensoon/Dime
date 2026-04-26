@@ -1,179 +1,132 @@
+import React, { useEffect, useState } from 'react';
+import { 
+  View, 
+  ScrollView, 
+  StyleSheet, 
+  SafeAreaView, 
+  TouchableOpacity, 
+  ActivityIndicator,
+  StatusBar
+} from 'react-native';
+import { useRouter } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from '@/components/themed-text';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useRouter } from 'expo-router';
-import React, { useEffect, useState } from 'react';
-import {
-  Alert,
-  Dimensions,
-  SafeAreaView,
-  ScrollView,
-  StatusBar,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
 
-const { width } = Dimensions.get('window');
-
+// Tus colores institucionales
 const IMSS_COLORS = {
   green: '#1F4529',
   gold: '#B38E5D',
   gray: '#6F7271',
   lightGray: '#F4F4F4',
-  white: '#FFFFFF',
 };
-
-// Menú actualizado: Eliminamos ejercicios para moverlos a la sección de Tests (Evaluaciones)
-const MENU_ITEMS = [
-  { 
-    id: 'tests', 
-    titulo: 'Bienestar', 
-    subtitulo: 'Tests y Ejercicios', 
-    icon: '📝', 
-    ruta: '/tests' // Esta será tu nueva ventana principal de contenido
-  },
-  { 
-    id: 'chatbot', 
-    titulo: 'Asistente Virtual', 
-    subtitulo: 'Chat de Apoyo', 
-    icon: '💬', 
-    ruta: '/chat' 
-  },
-  { 
-    id: 'diario', 
-    titulo: 'Seguimiento', 
-    subtitulo: 'Mi Diario Personal', 
-    icon: '📔', 
-    ruta: '/diary' 
-  },
-] as const;
 
 export default function MainScreen() {
   const isDark = useColorScheme() === 'dark';
   const router = useRouter();
-  const [username, setUsername] = useState('Usuario');
+  
+  // Estados para el diseño y control (Manteniendo tus variables originales)
+  const [username, setUsername] = useState('');
+  const [isVerifying, setIsVerifying] = useState(true);
 
   useEffect(() => {
-    const cargarDatos = async () => {
+    const checkUserStatus = async () => {
       try {
-        const name = await AsyncStorage.getItem('username');
-        if (name) {
-          setUsername(name);
+        // 1. Cargamos el nombre guardado en el Login
+        const storedName = await AsyncStorage.getItem('username');
+        if (storedName) setUsername(storedName);
+
+        // 2. Verificamos si completó el test obligatorio
+        const completado = await AsyncStorage.getItem('gad7_completed');
+        
+        if (completado !== 'true') {
+          // Si no ha completado, lo mandamos al test inicial (PHQ9)
+          router.replace('/PHQ9');
+        } else {
+          // Si ya lo hizo, permitimos mostrar el Main
+          setIsVerifying(false);
         }
-      } catch (error) {
-        console.error('Error cargando datos:', error);
+      } catch (e) {
+        // Si hay error, liberamos la pantalla para no bloquear al usuario
+        setIsVerifying(false);
       }
     };
-    cargarDatos();
+
+    checkUserStatus();
   }, []);
 
-  const handleLogout = async () => {
-    Alert.alert(
-      'Cerrar Sesión',
-      '¿Estás seguro de que deseas salir?',
-      [
-        { text: 'Cancelar', style: 'cancel' },
-        {
-          text: 'Salir',
-          style: 'destructive',
-          onPress: async () => {
-            await AsyncStorage.clear();
-            router.replace('/login');
-          },
-        },
-      ]
+  // Loader institucional
+  if (isVerifying) {
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: isDark ? '#121212' : IMSS_COLORS.lightGray }]}>
+        <ActivityIndicator size="large" color={IMSS_COLORS.green} />
+      </View>
     );
-  };
+  }
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#121212' : IMSS_COLORS.lightGray }]}>
       <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
-      
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
-        {/* Header Superior */}
-        <View style={styles.topHeader}>
-          <View style={{ flex: 1 }}>
-            <ThemedText style={styles.welcomeText}>Bienvenido,</ThemedText>
-            <ThemedText type="title" style={[styles.userName, { color: isDark ? '#FFF' : IMSS_COLORS.green }]}>
-              {username}
-            </ThemedText>
-          </View>
+        {/* Header con estilo institucional */}
+        <View style={styles.header}>
+          <ThemedText type="title" style={[styles.welcomeText, { color: IMSS_COLORS.green }]}>
+            Hola, {username || 'Usuario'}
+          </ThemedText>
+          <View style={styles.goldDivider} />
+          <ThemedText style={[styles.subtitle, { color: IMSS_COLORS.gray }]}>
+            Bienvenido a tu salud digital
+          </ThemedText>
+        </View>
+
+        {/* Grid de botones de menú */}
+        <View style={styles.menuGrid}>
           
           <TouchableOpacity 
-            onPress={() => router.push('/profile')}
-            activeOpacity={0.7}
-            style={[styles.profileBadge, { backgroundColor: IMSS_COLORS.gold }]}
+            style={[styles.menuButton, { backgroundColor: isDark ? '#1E1E1E' : '#FFF' }]}
+            onPress={() => router.push('/tests')}
           >
-            <ThemedText style={styles.badgeText}>
-              {username.charAt(0).toUpperCase()}
-            </ThemedText>
-          </TouchableOpacity>
-        </View>
-
-        {/* Banner de Acción Rápida - Ahora enfocado a las Evaluaciones/Tests */}
-        <TouchableOpacity 
-          style={[styles.statusBanner, { backgroundColor: IMSS_COLORS.green }]}
-          onPress={() => router.push('/tests')}
-          activeOpacity={0.9}
-        >
-          <View style={styles.statusContent}>
-            <ThemedText style={styles.statusTitle}>Módulo de Salud Mental</ThemedText>
-            <ThemedText style={styles.statusSub}>Realiza tus tests y ejercicios pendientes aquí.</ThemedText>
-          </View>
-          <View style={styles.statusButton}>
-            <ThemedText style={styles.statusButtonText}>ENTRAR</ThemedText>
-          </View>
-        </TouchableOpacity>
-
-        <ThemedText style={styles.sectionTitle}>Panel Institucional</ThemedText>
-
-        {/* Grid de Menú Actualizado */}
-        <View style={styles.menuGrid}>
-          {MENU_ITEMS.map((item) => (
-            <TouchableOpacity 
-              key={item.id} 
-              style={[styles.gridItem, { backgroundColor: isDark ? '#1E1E1E' : IMSS_COLORS.white }]}
-              onPress={() => router.push(item.ruta)}
-            >
-              <View style={[styles.iconContainer, { backgroundColor: isDark ? '#2A2A2A' : '#F0F4F1' }]}>
-                <ThemedText style={styles.iconText}>{item.icon}</ThemedText>
-              </View>
-              <ThemedText style={[styles.itemTitle, { color: isDark ? '#FFF' : IMSS_COLORS.green }]}>
-                {item.titulo}
-              </ThemedText>
-              <ThemedText style={styles.itemSub}>{item.subtitulo}</ThemedText>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {/* Sección de Contactos Ayuda Directa */}
-        <ThemedText style={[styles.sectionTitle, { marginTop: 15 }]}>Soporte</ThemedText>
-        <TouchableOpacity 
-          style={[styles.resourceCard, { backgroundColor: isDark ? '#1E1E1E' : IMSS_COLORS.white }]}
-          onPress={() => router.push('/resources')}
-        >
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-            <View style={{ flex: 1 }}>
-              <ThemedText style={{ color: IMSS_COLORS.green, fontWeight: '700', fontSize: 16 }}>📞 Contactos de Emergencia</ThemedText>
-              <ThemedText style={styles.itemSub}>Líneas directas de apoyo institucional.</ThemedText>
+            <View style={[styles.iconCircle, { backgroundColor: '#E8F5E9' }]}>
+              <ThemedText style={styles.icon}>🧘</ThemedText>
             </View>
-            <ThemedText style={{ color: IMSS_COLORS.gold, fontSize: 20 }}>→</ThemedText>
-          </View>
-        </TouchableOpacity>
+            <ThemedText style={styles.menuTitle}>Bienestar</ThemedText>
+            <ThemedText style={styles.menuDesc}>Tests y Salud</ThemedText>
+          </TouchableOpacity>
 
-        {/* Botón de Cerrar Sesión */}
-        <TouchableOpacity 
-          style={styles.logoutFullBtn}
-          onPress={handleLogout}
-        >
-          <ThemedText style={styles.logoutText}>Cerrar Sesión Segura</ThemedText>
-        </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.menuButton, { backgroundColor: isDark ? '#1E1E1E' : '#FFF' }]}
+            onPress={() => router.push('/bitacora')}
+          >
+            <View style={[styles.iconCircle, { backgroundColor: '#E3F2FD' }]}>
+              <ThemedText style={styles.icon}>📝</ThemedText>
+            </View>
+            <ThemedText style={styles.menuTitle}>Bitácora</ThemedText>
+            <ThemedText style={styles.menuDesc}>Tus registros</ThemedText>
+          </TouchableOpacity>
 
-        <View style={styles.footer}>
-          <ThemedText style={styles.versionText}>© 2026 IMSS Digital</ThemedText>
-          <ThemedText style={styles.versionText}>Versión 1.1.0</ThemedText>
+          <TouchableOpacity 
+            style={[styles.menuButton, { backgroundColor: isDark ? '#1E1E1E' : '#FFF' }]}
+            onPress={() => router.push('/retos')}
+          >
+            <View style={[styles.iconCircle, { backgroundColor: '#FFF3E0' }]}>
+              <ThemedText style={styles.icon}>🏆</ThemedText>
+            </View>
+            <ThemedText style={styles.menuTitle}>Retos</ThemedText>
+            <ThemedText style={styles.menuDesc}>Metas diarias</ThemedText>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.menuButton, { backgroundColor: isDark ? '#1E1E1E' : '#FFF' }]}
+            onPress={() => router.push('/usuarios')}
+          >
+            <View style={[styles.iconCircle, { backgroundColor: '#F3E5F5' }]}>
+              <ThemedText style={styles.icon}>👥</ThemedText>
+            </View>
+            <ThemedText style={styles.menuTitle}>Usuarios</ThemedText>
+            <ThemedText style={styles.menuDesc}>Comunidad</ThemedText>
+          </TouchableOpacity>
+
         </View>
 
       </ScrollView>
@@ -182,94 +135,73 @@ export default function MainScreen() {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
-  scrollContent: { padding: 20 },
-  topHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: 25,
-    marginTop: 10 
+  container: {
+    flex: 1,
   },
-  welcomeText: { fontSize: 14, color: IMSS_COLORS.gray },
-  userName: { fontSize: 24, fontWeight: '800' },
-  profileBadge: { 
-    width: 48, 
-    height: 48, 
-    borderRadius: 24, 
-    justifyContent: 'center', 
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    elevation: 4,
   },
-  badgeText: { color: '#FFF', fontWeight: 'bold', fontSize: 18 },
-  statusBanner: { 
-    padding: 20, 
-    borderRadius: 15, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    marginBottom: 30,
-    elevation: 4 
+  scrollContent: {
+    padding: 25,
   },
-  statusContent: { flex: 1 },
-  statusTitle: { color: '#FFF', fontSize: 18, fontWeight: 'bold' },
-  statusSub: { color: 'rgba(255,255,255,0.8)', fontSize: 12, marginTop: 5 },
-  statusButton: { 
-    backgroundColor: IMSS_COLORS.gold, 
-    paddingHorizontal: 15,
-    paddingVertical: 8,
-    borderRadius: 20, 
-    marginLeft: 10
+  header: {
+    marginBottom: 35,
+    marginTop: 20,
   },
-  statusButtonText: { color: '#FFF', fontWeight: '900', fontSize: 11 },
-  sectionTitle: { 
-    fontSize: 12, 
-    fontWeight: '800', 
-    color: IMSS_COLORS.gray, 
-    textTransform: 'uppercase', 
-    marginBottom: 15,
-    letterSpacing: 1
+  welcomeText: {
+    fontSize: 28,
+    fontWeight: '800',
   },
-  menuGrid: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
-    justifyContent: 'space-between' 
-  },
-  gridItem: { 
-    width: (width - 55) / 2, 
-    padding: 16, 
-    borderRadius: 15, 
-    marginBottom: 15,
-    elevation: 2,
-    borderLeftWidth: 4,
-    borderLeftColor: IMSS_COLORS.gold
-  },
-  iconContainer: { 
-    width: 42, 
-    height: 42, 
-    borderRadius: 10, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginBottom: 12 
-  },
-  iconText: { fontSize: 22 },
-  itemTitle: { fontSize: 14, fontWeight: '700' },
-  itemSub: { fontSize: 11, color: IMSS_COLORS.gray, marginTop: 4, lineHeight: 15 },
-  resourceCard: {
-    padding: 18,
-    borderRadius: 12,
-    marginBottom: 25,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  logoutFullBtn: {
-    padding: 16,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#ff4444',
-    alignItems: 'center',
+  goldDivider: {
+    height: 4,
+    width: 45,
+    backgroundColor: IMSS_COLORS.gold,
     marginTop: 10,
+    borderRadius: 2,
   },
-  logoutText: { color: '#ff4444', fontWeight: 'bold', fontSize: 15 },
-  footer: { marginTop: 30, alignItems: 'center', paddingBottom: 30 },
-  versionText: { fontSize: 11, color: IMSS_COLORS.gray }
+  subtitle: {
+    fontSize: 16,
+    marginTop: 8,
+    fontWeight: '500',
+  },
+  menuGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  menuButton: {
+    width: '48%',
+    padding: 20,
+    borderRadius: 20,
+    marginBottom: 15,
+    alignItems: 'flex-start',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+  },
+  iconCircle: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 15,
+  },
+  icon: {
+    fontSize: 24,
+  },
+  menuTitle: {
+    fontWeight: '700',
+    fontSize: 15,
+    marginBottom: 4,
+  },
+  menuDesc: {
+    fontSize: 11,
+    color: '#999',
+    fontWeight: '500',
+  }
 });

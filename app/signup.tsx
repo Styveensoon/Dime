@@ -85,8 +85,7 @@ export default function SignupScreen() {
 
       console.log("Paso 2: Sesión iniciada localmente");
 
-      Alert.alert('Éxito', '¡Cuenta institucional creada correctamente!');
-      router.push('/main');
+      router.push('/testGAD7');
 
     } catch (error: any) {
       console.error("❌ ERROR:", error);

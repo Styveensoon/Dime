@@ -1,9 +1,9 @@
-import React, { useState } from "react";
-import { ScrollView, StyleSheet, TouchableOpacity, Image, TextInput } from "react-native";
-import { useRouter } from "expo-router";
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useRouter } from "expo-router";
+import React, { useState } from "react";
+import { Image, ScrollView, StyleSheet, TextInput, TouchableOpacity } from "react-native";
 
 const ImageTest = require('@/assets/images/Ubuntu.jpg');
 const IMSS_GREEN = '#1F4529';
@@ -23,7 +23,7 @@ export default function TestMMSE() {
     const handleFinish = async () => {
         await AsyncStorage.setItem('mmse_completed', 'true');
         // Navega directamente a testGAD7 sin alerta
-        router.replace('/testGAD7');
+        router.replace('/main');
     };
 
     return (
