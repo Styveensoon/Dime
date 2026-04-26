@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { 
     ScrollView, 
     StyleSheet, 
@@ -12,9 +12,12 @@ import {
 } from "react-native";
 import { useRouter, Stack } from "expo-router";
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { auth } from "../firebaseConfig";
+import { onAuthStateChanged } from "firebase/auth";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Fonts } from "@/constants/theme";
+import { FB_API_KEY, FB_BASE_URL, ANTHROPIC_KEY } from "../constants";
 
 const imgTest1 = require('@/assets/images/testGAD7/Exercise1.png');
 const imgTest2 = require('@/assets/images/testGAD7/Exercise2.png');
@@ -38,9 +41,106 @@ const C = {
 
 type Responses = { [key: number]: number };
 
+// ─── ANTHROPIC HELPER ─────────────────────────────────────────────────────────
+const generarPrediccionIA = async (
+  testNombre: string,
+  preguntas: { id: number; text: string }[],
+  opciones: string[],
+  respuestas: Responses,
+  puntuacion: number,
+  nivelCalculado: string,
+): Promise<{ sintesis: string; prediccion: string }> => {
+  const detalleRespuestas = preguntas
+    .map(q => `  P${q.id}: "${q.text}" → "${opciones[respuestas[q.id]] ?? 'Sin respuesta'}" (${respuestas[q.id] ?? 0} pts)`)
+    .join('\n');
+
+  const prompt = `Eres un asistente clínico experto. Analiza los resultados del test ${testNombre} de un paciente y genera:
+
+1. SÍNTESIS CLÍNICA (máx. 120 palabras): Redacción concisa orientada al médico sobre el patrón de respuestas, síntomas predominantes y áreas de mayor afectación. Usa terminología clínica apropiada.
+
+2. PREDICCIÓN (máx. 60 palabras): Basándote SOLO en las respuestas (sin ver el puntaje final), predice el nivel de severidad esperado y su implicación clínica.
+
+Respuestas del paciente:
+${detalleRespuestas}
+
+Puntaje total: ${puntuacion}/21
+Nivel calculado: ${nivelCalculado}
+
+Responde ÚNICAMENTE con JSON válido, sin texto adicional ni backticks:
+{"sintesis": "...", "prediccion": "..."}`;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': ANTHROPIC_KEY,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+
+  const data = await res.json();
+  const texto = data.content?.map((b: any) => b.text || '').join('') ?? '';
+  try {
+    const clean = texto.replace(/```json|```/g, '').trim();
+    return JSON.parse(clean);
+  } catch {
+    return { sintesis: texto, prediccion: 'No disponible' };
+  }
+};
+
+// ─── FIRESTORE HELPERS ────────────────────────────────────────────────────────
+const toFirestoreFields = (obj: Record<string, any>): Record<string, any> => {
+  const fields: Record<string, any> = {};
+  for (const [key, val] of Object.entries(obj)) {
+    if (val === null || val === undefined)  fields[key] = { nullValue: null };
+    else if (typeof val === 'boolean')       fields[key] = { booleanValue: val };
+    else if (typeof val === 'number')        fields[key] = Number.isInteger(val) ? { integerValue: String(val) } : { doubleValue: val };
+    else if (typeof val === 'string')        fields[key] = { stringValue: val };
+    else if (Array.isArray(val))             fields[key] = { arrayValue: { values: val.map(v => typeof v === 'string' ? { stringValue: v } : { doubleValue: Number(v) }) } };
+    else if (typeof val === 'object')        fields[key] = { mapValue: { fields: toFirestoreFields(val) } };
+  }
+  return fields;
+};
+
+const guardarEnColeccion = async (
+  coleccion: string,
+  docId: string,
+  data: Record<string, any>,
+  fbBaseUrl: string,
+  fbApiKey: string,
+): Promise<void> => {
+  const url  = `${fbBaseUrl}/${coleccion}/${docId}?key=${fbApiKey}`;
+  const body = { fields: toFirestoreFields(data) };
+  const res  = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!res.ok) { const e = await res.text(); throw new Error(`Firestore ${coleccion} ${res.status}: ${e}`); }
+  console.log(`[Firebase/${coleccion}] guardado: ${docId}`);
+};
+
 export default function TestGAD7() {
     const router = useRouter();
     const [answers, setAnswers] = useState<Responses>({});
+    
+    // User Data & Loading States
+    const [userEmail, setUserEmail] = useState<string>('anonimo@app.com');
+    const [userName,  setUserName]  = useState<string>('Anónimo');
+    const [cargando,  setCargando]  = useState<boolean>(false);
+
+    // Auth & User Name
+    useEffect(() => {
+        const unsub = onAuthStateChanged(auth, async (user) => {
+            if (user?.email) setUserEmail(user.email);
+            try {
+                const n = await AsyncStorage.getItem('@Sime_userName');
+                if (n) setUserName(n);
+            } catch {}
+        });
+        return unsub;
+    }, []);
 
     const options = ["Nunca", "Varios días", "Más de la mitad", "Casi todos los días"];
 
@@ -59,15 +159,54 @@ export default function TestGAD7() {
     };
 
     const handleFinish = async () => {
-        // 2. Validamos que el número de respuestas sea igual al número de preguntas
+        // 1. Validamos que el número de respuestas sea igual al número de preguntas
         if (Object.keys(answers).length < questions.length) {
             Alert.alert(
                 "Atención", 
                 "Por favor, responde a todas las preguntas antes de continuar."
             );
-            return; // Detenemos la ejecución aquí si faltan respuestas
+            return; 
         }
 
+        setCargando(true);
+        try {
+            // 2. Cálculo de la puntuación
+            const total = Object.values(answers).reduce((a, b) => a + b, 0);
+            const nivel =
+                total <= 4  ? 'Mínimo'   :
+                total <= 9  ? 'Leve'     :
+                total <= 14 ? 'Moderado' : 'Severo';
+
+            // 3. Generar síntesis y predicción con IA
+            const { sintesis, prediccion } = await generarPrediccionIA(
+                'GAD-7 (Ansiedad Generalizada)',
+                questions,
+                options,
+                answers,
+                total,
+                nivel,
+            );
+
+            // 4. Guardar en Firestore incluyendo IA
+            const docId = `${userEmail}_gad7_${Date.now()}`.replace(/[^a-zA-Z0-9_@.-]/g, '_');
+            await guardarEnColeccion('testgad7', docId, {
+                email:      userEmail,
+                userName,
+                timestamp:  new Date().toISOString(),
+                respuestas: answers,
+                puntuacion: total,
+                nivel,
+                ia_sintesis:   sintesis,
+                ia_prediccion: prediccion,
+            }, FB_BASE_URL, FB_API_KEY);
+
+        } catch (e) {
+            console.warn('[testgad7] Error:', e);
+        } finally {
+            setCargando(false);
+        }
+
+        // 5. Continuar flujo
         await AsyncStorage.setItem('gad7_completed', 'true');
         router.replace("/TestPHQ9"); 
     };
@@ -138,8 +277,14 @@ export default function TestGAD7() {
                     </View>
                 ))}
 
-                <TouchableOpacity style={styles.nextBtn} onPress={handleFinish}>
-                    <ThemedText style={styles.nextBtnTxt}>Continuar al siguiente test</ThemedText>
+                <TouchableOpacity 
+                    style={[styles.nextBtn, cargando && { opacity: 0.6 }]} 
+                    onPress={handleFinish}
+                    disabled={cargando}
+                >
+                    <ThemedText style={styles.nextBtnTxt}>
+                        {cargando ? 'Analizando y guardando...' : 'Continuar al siguiente test'}
+                    </ThemedText>
                 </TouchableOpacity>
                 
             </ScrollView>

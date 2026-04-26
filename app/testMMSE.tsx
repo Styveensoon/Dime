@@ -1,35 +1,38 @@
 import React, { useState, useEffect, useRef } from "react";
+import { auth } from "../firebaseConfig";
+import { onAuthStateChanged } from "firebase/auth";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
     StyleSheet, View, TouchableOpacity, TextInput, 
     ActivityIndicator, ScrollView, Image,
     SafeAreaView, Platform, StatusBar, 
-    Alert // <-- 1. Importamos Alert
+    Alert 
 } from "react-native";
 import { Audio } from 'expo-av';
 import { useRouter, Stack } from "expo-router"; 
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { GROQ_KEY } from '../constants';
+import { GROQ_KEY, FB_API_KEY, FB_BASE_URL, ANTHROPIC_KEY } from '../constants';
 
 const IMAGENES_REGISTRO: Record<string, any> = {
-    "Balón": require ('@/assets/images/testMMSE/Sec1/Balon.jpg'),
-    "Bandera": require ('@/assets/images/testMMSE/Sec1/Bandera.jpg'),
-    "Árbol": require ('@/assets/images/testMMSE/Sec1/Arbol.jpg'),
-    "Silla": require ('@/assets/images/testMMSE/Sec1/Silla.jpg'),
-    "Llave": require ('@/assets/images/testMMSE/Sec1/Llave.jpg'),
-    "Reloj": require ('@/assets/images/testMMSE/Sec1/Reloj.jpg'),
-    "Libro": require ('@/assets/images/testMMSE/Sec1/Libro.jpg'),
-    "Lápiz": require ('@/assets/images/testMMSE/Sec1/Lapiz.jpg'),
-}
+    "Balón":   require('@/assets/images/testMMSE/Sec1/Balon.jpg'),
+    "Bandera": require('@/assets/images/testMMSE/Sec1/Bandera.jpg'),
+    "Árbol":   require('@/assets/images/testMMSE/Sec1/Arbol.jpg'),
+    "Silla":   require('@/assets/images/testMMSE/Sec1/Silla.jpg'),
+    "Llave":   require('@/assets/images/testMMSE/Sec1/Llave.jpg'),
+    "Reloj":   require('@/assets/images/testMMSE/Sec1/Reloj.jpg'),
+    "Libro":   require('@/assets/images/testMMSE/Sec1/Libro.jpg'),
+    "Lápiz":   require('@/assets/images/testMMSE/Sec1/Lapiz.jpg'),
+};
 
 const IMAGENES_DENOMINACION: Record<string, any> = {
-    "Lápiz": require ('@/assets/images/testMMSE/Sec2/Lapiz.jpg'),
-    "Reloj": require ('@/assets/images/testMMSE/Sec2/Reloj.jpg'),
-    "Celular": require ('@/assets/images/testMMSE/Sec2/Celular.jpg'),
-    "Lentes": require ('@/assets/images/testMMSE/Sec2/Lentes.jpg'),
-    "Moneda": require ('@/assets/images/testMMSE/Sec2/Moneda.jpg'),
-    "Taza": require ('@/assets/images/testMMSE/Sec2/Taza.jpg'),
-}
+    "Lápiz":   require('@/assets/images/testMMSE/Sec2/Lapiz.jpg'),
+    "Reloj":   require('@/assets/images/testMMSE/Sec2/Reloj.jpg'),
+    "Celular": require('@/assets/images/testMMSE/Sec2/Celular.jpg'),
+    "Lentes":  require('@/assets/images/testMMSE/Sec2/Lentes.jpg'),
+    "Moneda":  require('@/assets/images/testMMSE/Sec2/Moneda.jpg'),
+    "Taza":    require('@/assets/images/testMMSE/Sec2/Taza.jpg'),
+};
 
 const C = {
     bg: '#F0EDE8',
@@ -42,17 +45,108 @@ const C = {
     surfaceAlt: '#F8F4EF',
 };
 
-const NOMBRES_REGISTRO = Object.keys(IMAGENES_REGISTRO)
+const NOMBRES_REGISTRO    = Object.keys(IMAGENES_REGISTRO);
 const NOMBRES_DENOMINACION = Object.keys(IMAGENES_DENOMINACION);
 
+// ─── ANTHROPIC HELPER ─────────────────────────────────────────────────────────
+const generarPrediccionMMSE = async (
+  respuestas: { [key: number]: string },
+  itemsRegistro: string[],
+  itemsDenominacion: string[],
+): Promise<{ sintesis: string; prediccion: string }> => {
+  const preguntas = [
+    { id: 1, titulo: 'Orientación Temporal',  esperado: 'Fecha actual correcta' },
+    { id: 2, titulo: 'Orientación Espacial',  esperado: 'Lugar donde se encuentra' },
+    { id: 3, titulo: 'Registro de Palabras',  esperado: `Repetir: ${itemsRegistro.join(', ')}` },
+    { id: 4, titulo: 'Atención y Cálculo',    esperado: 'Serie: 100-7-7-7... (93, 86, 79, 72, 65)' },
+    { id: 5, titulo: 'Memoria Diferida',      esperado: `Recordar: ${itemsRegistro.join(', ')}` },
+    { id: 6, titulo: 'Denominación',          esperado: `Nombrar: ${itemsDenominacion.join(', ')}` },
+    { id: 7, titulo: 'Repetición',            esperado: '"Ni sí, ni no, ni pero"' },
+  ];
+
+  const detalle = preguntas
+    .map(p => `  [${p.titulo}]\n    Respuesta: "${respuestas[p.id] ?? 'Sin respuesta'}"\n    Esperado: ${p.esperado}`)
+    .join('\n');
+
+  const prompt = `Eres un neuropsicólogo clínico experto en el Mini-Mental State Examination (MMSE). Analiza las respuestas verbales transcritas de un paciente y genera:
+
+1. SÍNTESIS CLÍNICA (máx. 150 palabras): Evaluación orientada al médico sobre las capacidades cognitivas observadas. Comenta orientación temporo-espacial, memoria inmediata y diferida, atención, lenguaje y cualquier señal de deterioro cognitivo. Usa terminología clínica.
+
+2. PREDICCIÓN (máx. 60 palabras): Con base únicamente en el patrón de respuestas, predice si el paciente muestra cognición normal, deterioro leve, moderado o severo, y qué áreas específicas están más comprometidas.
+
+Respuestas transcritas del paciente:
+${detalle}
+
+Responde ÚNICAMENTE con JSON válido, sin texto adicional ni backticks:
+{"sintesis": "...", "prediccion": "..."}`;
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': ANTHROPIC_KEY,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 1000,
+      messages: [{ role: 'user', content: prompt }],
+    }),
+  });
+
+  const data = await res.json();
+  const texto = data.content?.map((b: any) => b.text || '').join('') ?? '';
+  try {
+    const clean = texto.replace(/```json|```/g, '').trim();
+    return JSON.parse(clean);
+  } catch {
+    return { sintesis: texto, prediccion: 'No disponible' };
+  }
+};
+
+// ─── FIRESTORE HELPERS ────────────────────────────────────────────────────────
+const toFirestoreFields = (obj: Record<string, any>): Record<string, any> => {
+  const fields: Record<string, any> = {};
+  for (const [key, val] of Object.entries(obj)) {
+    if (val === null || val === undefined)  fields[key] = { nullValue: null };
+    else if (typeof val === 'boolean')       fields[key] = { booleanValue: val };
+    else if (typeof val === 'number')        fields[key] = Number.isInteger(val) ? { integerValue: String(val) } : { doubleValue: val };
+    else if (typeof val === 'string')        fields[key] = { stringValue: val };
+    else if (Array.isArray(val))             fields[key] = { arrayValue: { values: val.map(v => typeof v === 'string' ? { stringValue: v } : { doubleValue: Number(v) }) } };
+    else if (typeof val === 'object')        fields[key] = { mapValue: { fields: toFirestoreFields(val) } };
+  }
+  return fields;
+};
+
+const guardarEnColeccion = async (
+  coleccion: string,
+  docId: string,
+  data: Record<string, any>,
+  fbBaseUrl: string,
+  fbApiKey: string,
+): Promise<void> => {
+  const url  = `${fbBaseUrl}/${coleccion}/${docId}?key=${fbApiKey}`;
+  const body = { fields: toFirestoreFields(data) };
+  const res  = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+  if (!res.ok) { const e = await res.text(); throw new Error(`Firestore ${coleccion} ${res.status}: ${e}`); }
+  console.log(`[Firebase/${coleccion}] guardado: ${docId}`);
+};
+
+// ─── COMPONENTE PRINCIPAL ─────────────────────────────────────────────────────
 export default function TestMMSE() {
     const router = useRouter();
     const [paso, setPaso] = useState(0);
     const [grabando, setGrabando] = useState(false);
     const [procesando, setProcesando] = useState(false);
+    const [guardando, setGuardando] = useState(false);
     const [respuestas, setRespuestas] = useState<{ [key: number]: string }>({});
     
+    // UI/Flow States
     const [isFinished, setIsFinished] = useState(false);
+    
+    // User Data States
+    const [userEmail, setUserEmail] = useState<string>('anonimo@app.com');
+    const [userName,  setUserName]  = useState<string>('Anónimo');
 
     // Variables para objetos aleatorios
     const [itemsRegistro, setItemsRegistro] = useState<string[]>([]);
@@ -60,24 +154,28 @@ export default function TestMMSE() {
 
     const grabacionRef = useRef<Audio.Recording | null>(null);
 
-    const prepararAudio = async () => {
-        await Audio.requestPermissionsAsync();
-        await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-    };
-
+    // Auth & User Name
     useEffect(() => {
+        const unsub = onAuthStateChanged(auth, async (user) => {
+            if (user?.email) setUserEmail(user.email);
+            try {
+                const n = await AsyncStorage.getItem('@Sime_userName');
+                if (n) setUserName(n);
+            } catch {}
+        });
+        return unsub;
+    }, []);
+
+    // Audio Prep & Random Items
+    useEffect(() => {
+        const prepararAudio = async () => {
+            await Audio.requestPermissionsAsync();
+            await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+        };
         prepararAudio();
 
-        const registroAleatorio = [...NOMBRES_REGISTRO]
-            .sort(() => 0.5 - Math.random())
-            .slice(0, 3);
-            
-        const denomAleatorio = [...NOMBRES_DENOMINACION]
-            .sort(() => 0.5 - Math.random())
-            .slice(0, 2);
-
-        setItemsRegistro(registroAleatorio);
-        setItemsDenominacion(denomAleatorio);
+        setItemsRegistro([...NOMBRES_REGISTRO].sort(() => 0.5 - Math.random()).slice(0, 3));
+        setItemsDenominacion([...NOMBRES_DENOMINACION].sort(() => 0.5 - Math.random()).slice(0, 2));
     }, []);
     
     const preguntas = [
@@ -134,23 +232,50 @@ export default function TestMMSE() {
     };
 
     const siguiente = () => {
-        // 2. Validamos que haya una respuesta guardada y no esté vacía
+        // Validación de respuesta vacía
         const respuestaActual = respuestas[currentQ.id];
         if (!respuestaActual || respuestaActual.trim() === "") {
             Alert.alert(
                 "Atención",
                 "Por favor, responde la pregunta actual para poder avanzar."
             );
-            return; // Si no hay respuesta válida, detenemos la función aquí
+            return; 
         }
 
         if (paso < preguntas.length - 1) setPaso(paso + 1);
         else finalizar();
     };
 
-    const finalizar = () => {
-        console.log("Resultados finales:", respuestas);
-        setIsFinished(true);
+    const finalizar = async () => {
+        setGuardando(true);
+        try {
+            // 1. Generar síntesis y predicción con IA
+            const { sintesis, prediccion } = await generarPrediccionMMSE(
+                respuestas,
+                itemsRegistro,
+                itemsDenominacion,
+            );
+
+            // 2. Guardar en Firestore incluyendo IA
+            const docId = `${userEmail}_mmse_${Date.now()}`.replace(/[^a-zA-Z0-9_@.-]/g, '_');
+            await guardarEnColeccion('testmmse', docId, {
+                email:             userEmail,
+                userName,
+                timestamp:         new Date().toISOString(),
+                respuestas,
+                itemsRegistro,
+                itemsDenominacion,
+                ia_sintesis:       sintesis,
+                ia_prediccion:     prediccion,
+            }, FB_BASE_URL, FB_API_KEY);
+
+        } catch (e) {
+            console.warn('[testmmse] Error:', e);
+        } finally {
+            setGuardando(false);
+            // 3. Mostramos la pantalla de finalización en lugar de salir de golpe
+            setIsFinished(true);
+        }
     };
 
     return (
@@ -273,9 +398,17 @@ export default function TestMMSE() {
                             )}
                         </View>
 
-                        <TouchableOpacity style={s.nextBtn} onPress={siguiente}>
+                        <TouchableOpacity 
+                            style={[s.nextBtn, guardando && { opacity: 0.6 }]} 
+                            onPress={siguiente}
+                            disabled={guardando}
+                        >
                             <ThemedText style={s.nextBtnTxt}>
-                                {paso === preguntas.length - 1 ? "Finalizar Registro" : "Siguiente Pregunta"}
+                                {guardando
+                                    ? 'Analizando respuestas...'
+                                    : paso === preguntas.length - 1 
+                                        ? "Finalizar Registro" 
+                                        : "Siguiente Pregunta"}
                             </ThemedText>
                         </TouchableOpacity>
                     </>
