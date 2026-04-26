@@ -42,7 +42,7 @@ export default function TestGAD7() {
 
     const handleFinish = async () => {
         await AsyncStorage.setItem('gad7_completed', 'true');
-        router.replace("/testMMSE"); 
+        router.replace("/TestPHQ9"); 
     };
 
     return (

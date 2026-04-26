@@ -36,7 +36,7 @@ export default function TestPHQ9() {
 
     const handleFinish = async () => {
         await AsyncStorage.setItem('phq9_completed', 'true');
-        router.replace("/testGAD7");
+        router.replace("/testMMSE");
     };
 
     return (
