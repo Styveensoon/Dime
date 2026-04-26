@@ -1,6 +1,6 @@
-import { Audio } from 'expo-av';
-import * as Speech from 'expo-speech';
-import { useEffect, useRef, useState } from 'react';
+import { Audio } from 'expo-av'
+import * as Speech from 'expo-speech'
+import { useEffect, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Animated,
@@ -13,18 +13,9 @@ import {
   TextInput,
   TouchableOpacity,
   View,
-} from 'react-native';
+} from 'react-native'
 
-// ─── CLAVES ────────────────────────────────────────────────────────────────────
-const ANTHROPIC_KEY  = process.env.ANTHROPIC_KEY;
-const GROQ_KEY      = process.env.GROQ_KEY;
-const MODEL    = process.env.MODEL;
-
-// ─── FIREBASE ─────────────────────────────────────────────────────────────────
-const FB_PROJECT  = process.env.FB_PROJECT;
-const FB_API_KEY  = process.env.FB_API_KEY;
-const FB_BASE_URL = `https://firestore.googleapis.com/v1/projects/${FB_PROJECT}/databases/(default)/documents`
-// ID único por sesión
+import { ANTHROPIC_KEY, FB_API_KEY, FB_BASE_URL, GROQ_KEY, MODEL } from '../constants'
 const SESSION_ID = `sesion_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
 
 // ─── PALETA DARK ──────────────────────────────────────────────────────────────
