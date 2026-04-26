@@ -9,7 +9,8 @@ import {
   TouchableOpacity, 
   View, 
   Dimensions,
-  StatusBar
+  StatusBar,
+  Platform // <-- 1. Importamos Platform
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -23,7 +24,6 @@ const IMSS_COLORS = {
   softGray: '#F9F9F9',
 };
 
-// Asegúrate de que estas rutas existan en tu carpeta (app/tests/index.tsx, etc.)
 const MENU_ITEMS = [
   { id: 'tests', titulo: 'Evaluaciones', subtitulo: 'IA y Diagnóstico', icon: '📋', ruta: '/tests' },
   { id: 'chatbot', titulo: 'Asistente Virtual', subtitulo: 'Chat con Claude', icon: '💬', ruta: '/chat' },
@@ -51,8 +51,17 @@ export default function MainScreen() {
   const userInitial = username.charAt(0).toUpperCase();
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#121212' : IMSS_COLORS.white }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+    <SafeAreaView 
+      style={[
+        styles.container, 
+        { 
+          backgroundColor: isDark ? '#121212' : IMSS_COLORS.white,
+          // 2. Agregamos el padding dinámico solo para Android
+          paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 
+        }
+      ]}
+    >
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent={true} />
       
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
@@ -71,7 +80,6 @@ export default function MainScreen() {
           </Link>
         </View>
 
-        {/* Banner de Acción Principal - CORREGIDO EL PUSH */}
         <TouchableOpacity 
           style={styles.heroBanner}
           onPress={() => router.push('/tests')}
@@ -97,7 +105,6 @@ export default function MainScreen() {
               key={item.id} 
               style={[styles.gridCard, { backgroundColor: isDark ? '#1E1E1E' : IMSS_COLORS.softGray }]}
               onPress={() => {
-                // Validación de ruta antes de navegar
                 if (item.ruta) {
                   router.push(item.ruta as any);
                 }
@@ -129,7 +136,8 @@ export default function MainScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { paddingHorizontal: 25, paddingTop: 20, paddingBottom: 40 },
+  // Se redujo ligeramente el paddingTop del ScrollView ya que ahora SafeAreaView nos separa correctamente
+  scrollContent: { paddingHorizontal: 25, paddingTop: 10, paddingBottom: 40 }, 
   topHeader: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 

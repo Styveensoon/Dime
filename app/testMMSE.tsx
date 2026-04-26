@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef } from "react";
 import { 
     StyleSheet, View, TouchableOpacity, TextInput, 
-    ActivityIndicator, Animated, ScrollView, Image 
+    ActivityIndicator, ScrollView, Image,
+    SafeAreaView, Platform, StatusBar // <-- Importamos los componentes de layout
 } from "react-native";
 import { Audio } from 'expo-av';
-import { useRouter } from "expo-router";
+import { useRouter, Stack } from "expo-router"; // <-- Importamos Stack
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { GROQ_KEY } from '../constants';
 
-const IMAGENES_REGISTRO = {
+const IMAGENES_REGISTRO: Record<string, any> = {
     "Balón": require ('@/assets/images/testMMSE/Sec1/Balon.jpg'),
     "Bandera": require ('@/assets/images/testMMSE/Sec1/Bandera.jpg'),
     "Árbol": require ('@/assets/images/testMMSE/Sec1/Arbol.jpg'),
@@ -20,7 +21,7 @@ const IMAGENES_REGISTRO = {
     "Lápiz": require ('@/assets/images/testMMSE/Sec1/Lapiz.jpg'),
 }
 
-const IMAGENES_DENOMINACION = {
+const IMAGENES_DENOMINACION: Record<string, any> = {
     "Lápiz": require ('@/assets/images/testMMSE/Sec2/Lapiz.jpg'),
     "Reloj": require ('@/assets/images/testMMSE/Sec2/Reloj.jpg'),
     "Celular": require ('@/assets/images/testMMSE/Sec2/Celular.jpg'),
@@ -56,7 +57,15 @@ export default function TestMMSE() {
 
     const grabacionRef = useRef<Audio.Recording | null>(null);
 
+    
+    const prepararAudio = async () => {
+        await Audio.requestPermissionsAsync();
+        await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+    };
+
     useEffect(() => {
+        prepararAudio();
+
         const registroAleatorio = [...NOMBRES_REGISTRO]
             .sort(() => 0.5 - Math.random())
             .slice(0, 3);
@@ -68,12 +77,7 @@ export default function TestMMSE() {
         setItemsRegistro(registroAleatorio);
         setItemsDenominacion(denomAleatorio);
     }, []);
-
-    const prepararAudio = async () => {
-        await Audio.requestPermissionsAsync();
-        await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-    };
-
+    
     const preguntas = [
         { id: 1, title: "Orientación Temporal", text: "¿En qué fecha estamos?", tipo: "voz" },
         { id: 2, title: "Orientación Espacial", text: "¿Dónde se encuentra usted ahora?", tipo: "voz" },
@@ -86,7 +90,6 @@ export default function TestMMSE() {
 
     const currentQ = preguntas[paso];
 
-    // --- Lógica de Grabación (Basada en chat.tsx) ---
     const iniciarGrabacion = async () => {
         try {
             const { recording } = await Audio.Recording.createAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
@@ -139,13 +142,30 @@ export default function TestMMSE() {
     };
 
     return (
-        <ThemedView style={s.container}>
+        <SafeAreaView 
+            style={[
+                s.container,
+                { paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 }
+            ]}
+        >
+            <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
+            
+            {/* Oculta la barra nativa de navegación de Expo Router */}
+            <Stack.Screen options={{ headerShown: false }} />
+
+            {/* Barra superior con el botón Volver */}
+            <View style={s.topBar}>
+                <TouchableOpacity onPress={() => router.back()} style={s.backButton}>
+                    <ThemedText style={{ color: C.accent, fontWeight: 'bold', fontSize: 16 }}>← Volver</ThemedText>
+                </TouchableOpacity>
+            </View>
+
             <ScrollView 
                 showsVerticalScrollIndicator={false}
                 contentContainerStyle={s.scrollContent}
             >
                 <ThemedView style={s.header}>
-                    <ThemedText type="title" style={{ color: C.accent }}>MMSE Cognitivo</ThemedText>
+                    <ThemedText type="title" style={{ color: C.accent }}>Test Deterioro Cognitivo</ThemedText>
                     <ThemedText style={s.progreso}>Pregunta {paso + 1} de {preguntas.length}</ThemedText>
                 </ThemedView>
 
@@ -201,7 +221,7 @@ export default function TestMMSE() {
 
                                     {respuestas[currentQ.id] && (
                                         <View style={s.resultBox}>
-                                            <ThemedText style={s.resultLabel}>Voz: "{respuestas[currentQ.id]}"</ThemedText>
+                                            <ThemedText style={s.resultLabel}>Voz: {'"'}{respuestas[currentQ.id]}{'"'}</ThemedText>
                                         </View>
                                     )}
                                 </>
@@ -226,7 +246,7 @@ export default function TestMMSE() {
                     </ThemedText>
                 </TouchableOpacity>
             </ScrollView>
-        </ThemedView>
+        </SafeAreaView>
     );
 }
 
@@ -234,8 +254,16 @@ const s = StyleSheet.create({
     container: {
         flex: 1, 
         backgroundColor: C.bg, 
-        padding: 20, 
-        justifyContent: 'center' 
+    },
+    topBar: {
+        paddingHorizontal: 20,
+        paddingVertical: 15,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    backButton: { 
+        paddingVertical: 5, 
+        paddingRight: 15 
     },
     header: {
         marginBottom: 40, 
@@ -379,5 +407,9 @@ const s = StyleSheet.create({
         fontSize: 12,
         color: C.accent,
         fontWeight: '600',
+    },
+    scrollContent: {
+        paddingHorizontal: 20,
+        paddingBottom: 40, 
     },
 });

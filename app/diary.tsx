@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { 
   ActivityIndicator, Alert, KeyboardAvoidingView, Platform, SafeAreaView, 
-  ScrollView, StyleSheet, TextInput, TouchableOpacity, View, Dimensions 
+  ScrollView, StyleSheet, TextInput, TouchableOpacity, View, Dimensions,
+  StatusBar // <-- 1. Importamos StatusBar
 } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -94,12 +95,19 @@ export default function DiaryScreen() {
   };
 
   return (
-    <SafeAreaView style={styles.root}>
-      {/* Header Institucional */}
+    <SafeAreaView 
+      style={[
+        styles.root,
+        { paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 }
+      ]}
+    >
+      <StatusBar barStyle="dark-content" backgroundColor="transparent" translucent={true} />
+
       <View style={styles.topBar}>
-        <TouchableOpacity onPress={() => router.replace('/(tabs)/main')}>
-          <ThemedText style={styles.backTxt}>Panel Principal</ThemedText>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <ThemedText style={{ color: IMSS_COLORS.gold, fontWeight: 'bold', fontSize: 16 }}>← Volver</ThemedText>
         </TouchableOpacity>
+        
         <View style={styles.streakBadge}>
           <ThemedText style={styles.streakTxt}>🔥 {streak} días</ThemedText>
         </View>
@@ -143,7 +151,9 @@ export default function DiaryScreen() {
                   onPress={() => setMood(m.val)} 
                   style={[styles.moodCircle, mood === m.val && { borderColor: m.color, backgroundColor: m.color + '10', borderWidth: 2 }]}
                 >
-                  <ThemedText style={{fontSize: 28}}>{m.icon}</ThemedText>
+                  <ThemedText style={{ fontSize: 28, lineHeight: 34, includeFontPadding: false }}>
+                    {m.icon}
+                  </ThemedText>
                   <ThemedText style={[styles.moodLbl, mood === m.val && { color: m.color, fontWeight: '700' }]}>{m.label}</ThemedText>
                 </TouchableOpacity>
               ))}
@@ -176,8 +186,16 @@ export default function DiaryScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: IMSS_COLORS.lightBg },
-  topBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 20, backgroundColor: IMSS_COLORS.white },
-  backTxt: { color: IMSS_COLORS.green, fontWeight: '700', fontSize: 14 },
+  topBar: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingHorizontal: 20, 
+    paddingVertical: 15, 
+    backgroundColor: IMSS_COLORS.white 
+  },
+  backButton: { paddingVertical: 5, paddingRight: 15 },
+  
   streakBadge: { backgroundColor: IMSS_COLORS.green, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
   streakTxt: { color: IMSS_COLORS.white, fontSize: 12, fontWeight: 'bold' },
   
@@ -198,8 +216,8 @@ const styles = StyleSheet.create({
   logEmoji: { fontSize: 22 },
 
   moodSelector: { flexDirection: 'row', justifyContent: 'space-between', marginVertical: 30 },
-  moodCircle: { width: width * 0.2, alignItems: 'center', padding: 10, borderRadius: 15, backgroundColor: IMSS_COLORS.white },
-  moodLbl: { fontSize: 10, marginTop: 8, color: IMSS_COLORS.muted },
+  moodCircle: { width: width * 0.2, alignItems: 'center', padding: 10, borderRadius: 15, backgroundColor: IMSS_COLORS.white},
+  moodLbl: { fontSize: 10, marginTop: 15, color: IMSS_COLORS.muted },
 
   inputBox: { backgroundColor: IMSS_COLORS.white, padding: 20, borderRadius: 15 },
   inputLabel: { fontSize: 11, fontWeight: '800', color: IMSS_COLORS.gold, marginBottom: 10 },

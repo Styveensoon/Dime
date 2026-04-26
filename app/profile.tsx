@@ -10,7 +10,8 @@ import {
   TouchableOpacity, 
   ScrollView,
   StatusBar,
-  ActivityIndicator
+  ActivityIndicator,
+  Platform // <-- 1. Importamos Platform
 } from 'react-native';
 
 const IMSS_COLORS = {
@@ -63,15 +64,33 @@ export default function ProfileScreen() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', backgroundColor: isDark ? '#121212' : IMSS_COLORS.lightGray }}>
+      <View 
+        style={{ 
+          flex: 1, 
+          justifyContent: 'center', 
+          backgroundColor: isDark ? '#121212' : IMSS_COLORS.lightGray,
+          // 2. También agregamos el padding en la pantalla de carga para evitar "saltos" visuales
+          paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 
+        }}
+      >
         <ActivityIndicator size="large" color={IMSS_COLORS.green} />
       </View>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#121212' : IMSS_COLORS.lightGray }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+    <SafeAreaView 
+      style={[
+        styles.container, 
+        { 
+          backgroundColor: isDark ? '#121212' : IMSS_COLORS.lightGray,
+          // 3. Agregamos el padding dinámico solo para Android en el contenedor principal
+          paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 
+        }
+      ]}
+    >
+      {/* 4. Ajustamos la StatusBar para que sea transparente y se coloque correctamente */}
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent={true} />
       
       <Stack.Screen options={{ headerShown: false }} />
 
@@ -139,7 +158,6 @@ function InfoItem({ label, value, isDark }: { label: string, value: string, isDa
   );
 }
 
-// ... (Mismos estilos que ya tenías)
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
@@ -224,6 +242,7 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     width: '100%',
     alignItems: 'center',
+    marginBottom: 50
   },
   btnCertificadoText: { color: '#FFF', fontWeight: '700', fontSize: 14 },
 });
