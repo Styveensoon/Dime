@@ -1,6 +1,6 @@
 import { ThemedText } from '@/components/themed-text';
 import { useColorScheme } from '@/hooks/use-color-scheme';
-import { useRouter, Stack } from 'expo-router'; // Añadimos Stack
+import { useRouter, Stack } from 'expo-router';
 import React from 'react';
 import { 
   SafeAreaView, 
@@ -9,6 +9,8 @@ import {
   TouchableOpacity, 
   View, 
   Linking,
+  Platform, // <-- 1. Importamos Platform
+  StatusBar // <-- 2. Importamos StatusBar
 } from 'react-native';
 
 const IMSS_COLORS = {
@@ -42,11 +44,23 @@ export default function ResourcesScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#121212' : IMSS_COLORS.lightGray }]}>
+    <SafeAreaView 
+      style={[
+        styles.container, 
+        { 
+          backgroundColor: isDark ? '#121212' : IMSS_COLORS.lightGray,
+          // 3. Agregamos el padding dinámico para Android
+          paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 
+        }
+      ]}
+    >
+      {/* 4. Configuramos el StatusBar para que sea transparente y fluido */}
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent={true} />
+
       {/* Esto fuerza a que la ventana tenga título y botón de atrás nativo si es necesario */}
       <Stack.Screen options={{ title: 'Directorio', headerShown: false }} />
 
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: isDark ? '#1A1A1A' : IMSS_COLORS.white }]}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
           <ThemedText style={{ color: IMSS_COLORS.gold, fontWeight: 'bold', fontSize: 16 }}>← Volver</ThemedText>
         </TouchableOpacity>

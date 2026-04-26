@@ -1,10 +1,13 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { auth } from "../firebaseConfig";
+import { onAuthStateChanged } from "firebase/auth";
 import { ScrollView, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { useRouter } from "expo-router";
 import AsyncStorage from '@react-native-async-storage/async-storage'; // Para el flujo de inicio
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
 import { Fonts } from "@/constants/theme";
+import { FB_API_KEY, FB_BASE_URL } from "../constants";
 
 const IMSS_GREEN = '#1F4529';
 const IMSS_GOLD = '#B38E5D';
@@ -19,9 +22,51 @@ const imgTest7 = require('@/assets/images/testGAD7/Exercise7.png');
 
 type Responses = { [key: number]: number };
 
+
+// ─── FIRESTORE HELPERS ────────────────────────────────────────────────────────
+const toFirestoreFields = (obj: Record<string, any>): Record<string, any> => {
+  const fields: Record<string, any> = {}
+  for (const [key, val] of Object.entries(obj)) {
+    if (val === null || val === undefined)  fields[key] = { nullValue: null }
+    else if (typeof val === 'boolean')       fields[key] = { booleanValue: val }
+    else if (typeof val === 'number')        fields[key] = Number.isInteger(val) ? { integerValue: String(val) } : { doubleValue: val }
+    else if (typeof val === 'string')        fields[key] = { stringValue: val }
+    else if (Array.isArray(val))             fields[key] = { arrayValue: { values: val.map(v => typeof v === 'string' ? { stringValue: v } : { doubleValue: Number(v) }) } }
+    else if (typeof val === 'object')        fields[key] = { mapValue: { fields: toFirestoreFields(val) } }
+  }
+  return fields
+}
+
+const guardarEnColeccion = async (
+  coleccion: string,
+  docId: string,
+  data: Record<string, any>,
+  fbBaseUrl: string,
+  fbApiKey: string,
+): Promise<void> => {
+  const url  = `${fbBaseUrl}/${coleccion}/${docId}?key=${fbApiKey}`
+  const body = { fields: toFirestoreFields(data) }
+  const res  = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  if (!res.ok) { const e = await res.text(); throw new Error(`Firestore ${coleccion} ${res.status}: ${e}`) }
+  console.log(`[Firebase/${coleccion}] guardado: ${docId}`)
+}
+
 export default function TestGAD7() {
     const router = useRouter();
     const [answers, setAnswers] = useState<Responses>({});
+    const [userEmail, setUserEmail]   = useState<string>('anonimo@app.com');
+    const [userName,  setUserName]    = useState<string>('Anónimo');
+
+    useEffect(() => {
+        const unsub = onAuthStateChanged(auth, async (user) => {
+            if (user?.email) setUserEmail(user.email);
+            try {
+                const n = await AsyncStorage.getItem('@Sime_userName');
+                if (n) setUserName(n);
+            } catch {}
+        });
+        return unsub;
+    }, []);
     // const [followUp, setFollowUp] = useState<number | null>(null);
 
     const options = ["Nunca", "Varios días", "Más de la mitad", "Casi todos los días"];
@@ -41,8 +86,24 @@ export default function TestGAD7() {
     };
 
     const handleFinish = async () => {
+        const total = Object.values(answers).reduce((a, b) => a + b, 0);
+        const nivel =
+            total <= 4  ? 'Mínimo' :
+            total <= 9  ? 'Leve'   :
+            total <= 14 ? 'Moderado' : 'Severo';
+        const docId = `${userEmail}_gad7_${Date.now()}`.replace(/[^a-zA-Z0-9_@.-]/g, '_');
+        try {
+            await guardarEnColeccion('testgad7', docId, {
+                email:       userEmail,
+                userName:    userName,
+                timestamp:   new Date().toISOString(),
+                respuestas:  answers,
+                puntuacion:  total,
+                nivel,
+            }, FB_BASE_URL, FB_API_KEY);
+        } catch (e) { console.warn('[testgad7] Error al guardar:', e); }
         await AsyncStorage.setItem('gad7_completed', 'true');
-        router.replace("/TestPHQ9"); 
+        router.replace("/TestPHQ9");
     };
 
     return (

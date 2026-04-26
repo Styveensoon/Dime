@@ -9,7 +9,8 @@ import {
   TouchableOpacity, 
   View, 
   Dimensions,
-  StatusBar
+  StatusBar,
+  Platform // <-- 1. Importamos Platform
 } from 'react-native';
 
 const { width } = Dimensions.get('window');
@@ -63,8 +64,26 @@ export default function UnifiedExercisesScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: isDark ? '#121212' : IMSS_COLORS.white }]}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} />
+    <SafeAreaView 
+      style={[
+        styles.container, 
+        { 
+          backgroundColor: isDark ? '#121212' : IMSS_COLORS.white,
+          // 2. Padding dinámico para Android
+          paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0 
+        }
+      ]}
+    >
+      {/* 3. StatusBar transparente */}
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor="transparent" translucent={true} />
+      
+      {/* 4. Agregamos el botón de regreso */}
+      <View style={styles.topBar}>
+        <TouchableOpacity onPress={() => router.back()} style={styles.backButton}>
+          <ThemedText style={{ color: IMSS_COLORS.gold, fontWeight: 'bold', fontSize: 16 }}>← Volver</ThemedText>
+        </TouchableOpacity>
+      </View>
+
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         
         <View style={styles.header}>
@@ -103,7 +122,16 @@ export default function UnifiedExercisesScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  scrollContent: { paddingHorizontal: 25, paddingTop: 30, paddingBottom: 50 },
+  // 5. Agregamos estilos para el topBar y backButton
+  topBar: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  backButton: { paddingVertical: 5, paddingRight: 15 },
+  
+  scrollContent: { paddingHorizontal: 25, paddingTop: 10, paddingBottom: 50 }, // Reduje un poco el paddingTop para equilibrar el botón nuevo
   header: { marginBottom: 35 },
   headerTitle: { fontSize: 30, fontWeight: '900' },
   headerSub: { fontSize: 15, color: IMSS_COLORS.gray, marginTop: 4 },
@@ -142,7 +170,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2
   },
-  largeEmoji: { fontSize: 32 }, // EMOJIS MÁS GRANDES
+  largeEmoji: { fontSize: 32 },
   cardContent: { marginTop: 15 },
   cardTitle: { fontSize: 17, fontWeight: '800' },
   cardSub: { fontSize: 11, color: IMSS_COLORS.gray, marginTop: 4, fontWeight: '600' },

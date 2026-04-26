@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
+import { auth } from "../firebaseConfig";
+import { onAuthStateChanged } from "firebase/auth";
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { 
     StyleSheet, View, TouchableOpacity, TextInput, 
     ActivityIndicator, Animated, ScrollView, Image 
@@ -7,7 +10,7 @@ import { Audio } from 'expo-av';
 import { useRouter } from "expo-router";
 import { ThemedText } from "@/components/themed-text";
 import { ThemedView } from "@/components/themed-view";
-import { GROQ_KEY } from '../constants';
+import { GROQ_KEY, FB_API_KEY, FB_BASE_URL } from '../constants';
 
 const IMAGENES_REGISTRO = {
     "Balón": require ('@/assets/images/testMMSE/Sec1/Balon.jpg'),
@@ -43,12 +46,54 @@ const C = {
 const NOMBRES_REGISTRO = Object.keys(IMAGENES_REGISTRO)
 const NOMBRES_DENOMINACION = Object.keys(IMAGENES_DENOMINACION);
 
+
+// ─── FIRESTORE HELPERS ────────────────────────────────────────────────────────
+const toFirestoreFields = (obj: Record<string, any>): Record<string, any> => {
+  const fields: Record<string, any> = {}
+  for (const [key, val] of Object.entries(obj)) {
+    if (val === null || val === undefined)  fields[key] = { nullValue: null }
+    else if (typeof val === 'boolean')       fields[key] = { booleanValue: val }
+    else if (typeof val === 'number')        fields[key] = Number.isInteger(val) ? { integerValue: String(val) } : { doubleValue: val }
+    else if (typeof val === 'string')        fields[key] = { stringValue: val }
+    else if (Array.isArray(val))             fields[key] = { arrayValue: { values: val.map(v => typeof v === 'string' ? { stringValue: v } : { doubleValue: Number(v) }) } }
+    else if (typeof val === 'object')        fields[key] = { mapValue: { fields: toFirestoreFields(val) } }
+  }
+  return fields
+}
+
+const guardarEnColeccion = async (
+  coleccion: string,
+  docId: string,
+  data: Record<string, any>,
+  fbBaseUrl: string,
+  fbApiKey: string,
+): Promise<void> => {
+  const url  = `${fbBaseUrl}/${coleccion}/${docId}?key=${fbApiKey}`
+  const body = { fields: toFirestoreFields(data) }
+  const res  = await fetch(url, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  if (!res.ok) { const e = await res.text(); throw new Error(`Firestore ${coleccion} ${res.status}: ${e}`) }
+  console.log(`[Firebase/${coleccion}] guardado: ${docId}`)
+}
+
 export default function TestMMSE() {
     const router = useRouter();
     const [paso, setPaso] = useState(0);
     const [grabando, setGrabando] = useState(false);
     const [procesando, setProcesando] = useState(false);
-    const [respuestas, setRespuestas] = useState<{ [key: number]: string }>({});
+    const [respuestas, setRespuestas]   = useState<{ [key: number]: string }>({});
+    const [userEmail, setUserEmail]     = useState<string>('anonimo@app.com');
+    const [userName,  setUserName]      = useState<string>('Anónimo');
+
+    useEffect(() => {
+        const unsub = onAuthStateChanged(auth, async (user) => {
+            if (user?.email) setUserEmail(user.email);
+            try {
+                const n = await AsyncStorage.getItem('@Sime_userName');
+                if (n) setUserName(n);
+            } catch {}
+        });
+        return unsub;
+    }, []);
 
     // Variables para objetos aleatorios
     const [itemsRegistro, setItemsRegistro] = useState<string[]>([]);
@@ -133,8 +178,18 @@ export default function TestMMSE() {
         else finalizar();
     };
 
-    const finalizar = () => {
-        console.log("Resultados finales:", respuestas);
+    const finalizar = async () => {
+        const docId = `${userEmail}_mmse_${Date.now()}`.replace(/[^a-zA-Z0-9_@.-]/g, '_');
+        try {
+            await guardarEnColeccion('testmmse', docId, {
+                email:           userEmail,
+                userName:        userName,
+                timestamp:       new Date().toISOString(),
+                respuestas,
+                itemsRegistro,
+                itemsDenominacion,
+            }, FB_BASE_URL, FB_API_KEY);
+        } catch (e) { console.warn('[testmmse] Error al guardar:', e); }
         router.replace('/main');
     };
 
