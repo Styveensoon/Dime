@@ -3,7 +3,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useRouter } from 'expo-router';
 import React from 'react';
 import { 
-  SafeAreaView, 
+  SafeAreaView,
   ScrollView, 
   StyleSheet, 
   TouchableOpacity, 
@@ -25,8 +25,8 @@ const IMSS_COLORS = {
 // --- GRUPO 1: SALUD MENTAL (Tests Clínicos) ---
 const MENTAL_HEALTH = [
   { id: 'gad7', titulo: 'Ansiedad', subtitulo: 'Escala GAD-7', icon: '🧘', ruta: '/testGAD7' },
-  { id: 'phq9', titulo: 'Depresión', subtitulo: 'Escala PHQ-9', icon: '📉', ruta: '/testPHQ9' },
-  { id: 'pss', titulo: 'Estrés', subtitulo: 'Escala PSS', icon: '🌋', ruta: '/testPSS' },
+  { id: 'phq9', titulo: 'Depresión', subtitulo: 'Escala PHQ-9', icon: '📉', ruta: '/TestPHQ9' },
+  { id: 'mmse', titulo: 'Deterioro Cognitivo', subtitulo: 'Escala MMSE', icon: '🌋', ruta: '/testMMSE' },
 ];
 
 // --- GRUPO 2: COGNICIÓN (Actividades Mentales) ---
