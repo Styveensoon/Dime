@@ -18,6 +18,8 @@ import {
   TouchableOpacity,
   View
 } from 'react-native';
+// 1. Importamos Ionicons para el icono del ojo
+import { Ionicons } from '@expo/vector-icons'; 
 
 const IMSS_COLORS = {
   green: '#1F4529',
@@ -32,12 +34,13 @@ export default function LoginScreen() {
   const isDark = colorScheme === 'dark';
   const router = useRouter();
   
-  // VARIABLES ORIGINALES SIN CAMBIOS
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  
+  // 2. Agregamos el estado para controlar la visibilidad de la contraseña
+  const [showPassword, setShowPassword] = useState(false);
 
-  // LÓGICA ORIGINAL SIN CAMBIOS
   const handleLogin = async () => {
     if (!email || !password) {
       Alert.alert('Atención', 'Por favor completa tus credenciales de acceso.');
@@ -112,18 +115,34 @@ export default function LoginScreen() {
 
             <View style={styles.inputContainer}>
               <ThemedText style={styles.label}>Contraseña</ThemedText>
-              <TextInput
-                style={[
-                  styles.input,
-                  { backgroundColor: isDark ? '#1E1E1E' : IMSS_COLORS.lightGray, color: isDark ? '#FFF' : '#000' }
-                ]}
-                placeholder="••••••••"
-                placeholderTextColor="#999"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-                editable={!loading}
-              />
+              {/* 3. Envolvemos el input y el icono en un View con posición relativa */}
+              <View style={styles.passwordWrapper}>
+                <TextInput
+                  style={[
+                    styles.input,
+                    styles.passwordInput, // Añadimos padding extra a la derecha
+                    { backgroundColor: isDark ? '#1E1E1E' : IMSS_COLORS.lightGray, color: isDark ? '#FFF' : '#000' }
+                  ]}
+                  placeholder="••••••••"
+                  placeholderTextColor="#999"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry={!showPassword} // 4. Vinculamos con el estado
+                  editable={!loading}
+                />
+                {/* 5. Agregamos el botón con el icono del ojo posicionado de forma absoluta */}
+                <TouchableOpacity
+                  style={styles.eyeIconContainer}
+                  onPress={() => setShowPassword(!showPassword)}
+                  activeOpacity={0.7}
+                >
+                  <Ionicons 
+                    name={showPassword ? 'eye-off' : 'eye'} 
+                    size={24} 
+                    color={IMSS_COLORS.gray} 
+                  />
+                </TouchableOpacity>
+              </View>
             </View>
 
             <Link href="/forgot-password" asChild>
@@ -201,6 +220,10 @@ const styles = StyleSheet.create({
     marginLeft: 5,
     textTransform: 'uppercase' 
   },
+  passwordWrapper: {
+    position: 'relative',
+    justifyContent: 'center',
+  },
   input: { 
     height: 60, 
     borderRadius: 18, 
@@ -208,6 +231,16 @@ const styles = StyleSheet.create({
     fontSize: 16,
     borderWidth: 1,
     borderColor: 'transparent'
+  },
+  passwordInput: {
+    paddingRight: 60, // Deja espacio para que el texto no se cruce por debajo del icono
+  },
+  eyeIconContainer: {
+    position: 'absolute',
+    right: 15,
+    height: '100%',
+    justifyContent: 'center',
+    paddingHorizontal: 5,
   },
   forgotBtn: { alignSelf: 'flex-end', marginTop: -5 },
   forgotLink: { fontSize: 14, fontWeight: '600' },
